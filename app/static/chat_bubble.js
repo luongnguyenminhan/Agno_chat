@@ -40,6 +40,14 @@ class ChatApp {
         this.mentionRegex = /@(\w+):([a-f0-9-]+)/g;  // Regex for @meeting:uuid pattern
     }
 
+    generateMessageId(message) {
+        // Generate unique message ID (handle temporary messages)
+        if (message.isTemporary) {
+            return message.id; // Use temp ID for temporary messages
+        }
+        return message.id || `${message.message_type}-${message.created_at}`;
+    }
+
     bindEvents() {
         // New conversation button
         this.newChatBtn?.addEventListener('click', () => this.createNewConversation());
@@ -230,20 +238,13 @@ class ChatApp {
 
                 // Load messages with proper format
                 if (conversation.messages && conversation.messages.length > 0) {
-                    const loadedMessages = conversation.messages.map(msg => ({
+                    // Clear existing messages and load fresh from API to avoid duplicates
+                    this.messages = conversation.messages.map(msg => ({
                         id: msg.id,
                         message_type: msg.role || msg.message_type,
                         content: msg.content,
                         created_at: msg.timestamp || msg.created_at
                     }));
-
-                    // Merge loaded messages with existing ones, avoiding duplicates
-                    loadedMessages.forEach(loadedMsg => {
-                        const existingMsg = this.messages.find(msg => msg.id === loadedMsg.id);
-                        if (!existingMsg) {
-                            this.messages.push(loadedMsg);
-                        }
-                    });
 
                     // Sort messages by creation time
                     this.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
@@ -274,22 +275,24 @@ class ChatApp {
     renderMessages() {
         if (!this.chatMessages) return;
 
-        // Clear existing messages
-        this.chatMessages.innerHTML = '<div class="messages-container"></div>';
-        const container = this.chatMessages.querySelector('.messages-container');
+        // Get or create messages container
+        let container = this.chatMessages.querySelector('.messages-container');
+        if (!container) {
+            this.chatMessages.innerHTML = '<div class="messages-container"></div>';
+            container = this.chatMessages.querySelector('.messages-container');
+        }
+
+        // Track existing message IDs in DOM for efficient lookup
+        const existingMessageIds = new Set();
+        container.querySelectorAll('[data-message-id]').forEach(el => {
+            existingMessageIds.add(el.getAttribute('data-message-id'));
+        });
 
         this.messages.forEach(message => {
-            // Generate message ID for checking
-            let messageId;
-            if (message.isTemporary) {
-                messageId = message.id; // Use temp ID for temporary messages
-            } else {
-                messageId = message.id || `${message.message_type}-${message.created_at}`;
-            }
+            const messageId = this.generateMessageId(message);
 
-            // Check if message element already exists
-            const existingMessage = container.querySelector(`[data-message-id="${messageId}"]`);
-            if (!existingMessage) {
+            // Only add message if it doesn't already exist in DOM
+            if (!existingMessageIds.has(messageId)) {
                 this.addMessageToChat(message, container, message.error);
             }
         });
@@ -304,13 +307,8 @@ class ChatApp {
         const messageEl = document.createElement('div');
         messageEl.className = `message ${message.message_type === 'user' ? 'user-message' : 'ai-message'}`;
 
-        // Generate unique message ID (handle temporary messages)
-        let messageId;
-        if (message.isTemporary) {
-            messageId = message.id; // Use temp ID for temporary messages
-        } else {
-            messageId = message.id || `${message.message_type}-${message.created_at}`;
-        }
+        // Generate unique message ID using helper function
+        const messageId = this.generateMessageId(message);
         messageEl.setAttribute('data-message-id', messageId);
 
         const timestamp = new Date(message.created_at).toLocaleTimeString([], {
@@ -383,6 +381,13 @@ class ChatApp {
 
                 // Replace temporary user message with real one
                 if (data.data.user_message) {
+                    // Remove temporary message from DOM first
+                    const tempMessageElement = document.querySelector(`[data-message-id="${tempUserMessage.id}"]`);
+                    if (tempMessageElement) {
+                        tempMessageElement.remove();
+                    }
+
+                    // Replace in messages array
                     const tempIndex = this.messages.findIndex(msg => msg.id === tempUserMessage.id);
                     if (tempIndex !== -1) {
                         this.messages[tempIndex] = {
@@ -393,6 +398,9 @@ class ChatApp {
                             isTemporary: false
                         };
                     }
+
+                    // Re-render to add the real message
+                    this.renderMessages();
                 }
 
                 // Show typing indicator for AI processing
@@ -408,7 +416,6 @@ class ChatApp {
                 // message_count is now provided by API via hybrid property
                 // No need to calculate client-side
 
-                this.renderMessages();
                 this.scrollToBottom();
             }
         } catch (error) {
@@ -417,9 +424,16 @@ class ChatApp {
             // Hide typing indicator on error
             this.hideTypingIndicator();
 
-            // Remove temporary message if API call failed
+            // Remove temporary message from both array and DOM if API call failed
             const tempIndex = this.messages.findIndex(msg => msg.id === tempUserMessage.id);
             if (tempIndex !== -1) {
+                // Remove from DOM first
+                const tempMessageElement = document.querySelector(`[data-message-id="${tempUserMessage.id}"]`);
+                if (tempMessageElement) {
+                    tempMessageElement.remove();
+                }
+
+                // Remove from array
                 this.messages.splice(tempIndex, 1);
                 this.renderMessages();
             }
