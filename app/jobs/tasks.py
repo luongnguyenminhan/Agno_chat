@@ -3,6 +3,8 @@ import json
 import logging
 from typing import Any, Dict, List
 
+import redis
+from agno.models.message import Message
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -10,8 +12,7 @@ from app.core.config import settings
 from app.jobs.celery_worker import celery_app
 from app.models.chat import ChatMessage, ChatMessageType
 from app.utils.llm import create_general_chat_agent, get_agno_postgres_db
-import redis
-from agno.models.message import Message
+from app.utils.redis import get_redis_client
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -20,12 +21,7 @@ engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Sync Redis client for Celery tasks
-sync_redis_client = redis.Redis(
-    host=settings.REDIS_HOST,
-    port=int(settings.REDIS_PORT),
-    db=int(settings.REDIS_DB),
-    decode_responses=True
-)
+sync_redis_client = get_redis_client()
 
 
 def fetch_conversation_history_sync(conversation_id: str, limit: int = 10) -> List[Message]:
@@ -35,9 +31,7 @@ def fetch_conversation_history_sync(conversation_id: str, limit: int = 10) -> Li
 
     db = SessionLocal()
     try:
-        messages = db.query(ChatMessage).filter(
-            ChatMessage.conversation_id == conversation_id
-        ).order_by(ChatMessage.created_at.desc()).limit(limit).all()
+        messages = db.query(ChatMessage).filter(ChatMessage.conversation_id == conversation_id).order_by(ChatMessage.created_at.desc()).limit(limit).all()
 
         history = []
         for msg in reversed(messages):  # Chronological order
@@ -81,12 +75,7 @@ def process_chat_message(self, conversation_id: str, user_message_id: str, conte
         logger.info(f"AI response content length: {len(ai_response_content)}")
 
         # Create AI message in database
-        ai_message = ChatMessage(
-            conversation_id=conversation_id,
-            message_type=ChatMessageType.agent,
-            content=ai_response_content,
-            user_id=user_id
-        )
+        ai_message = ChatMessage(conversation_id=conversation_id, message_type=ChatMessageType.agent, content=ai_response_content, user_id=user_id)
         db.add(ai_message)
         db.commit()
         db.refresh(ai_message)
@@ -95,16 +84,7 @@ def process_chat_message(self, conversation_id: str, user_message_id: str, conte
         # Broadcast message via Redis to SSE channel
         try:
             channel = f"conversation:{conversation_id}:messages"
-            message_data = {
-                "type": "chat_message",
-                "conversation_id": conversation_id,
-                "message": {
-                    "id": str(ai_message.id),
-                    "content": ai_response_content,
-                    "message_type": "agent",
-                    "created_at": ai_message.created_at.isoformat()
-                }
-            }
+            message_data = {"type": "chat_message", "conversation_id": conversation_id, "message": {"id": str(ai_message.id), "content": ai_response_content, "message_type": "agent", "created_at": ai_message.created_at.isoformat()}}
 
             # Use sync Redis client for broadcasting in Celery task
             result = sync_redis_client.publish(channel, json.dumps(message_data))
@@ -126,29 +106,14 @@ def process_chat_message(self, conversation_id: str, user_message_id: str, conte
 
         # Create error message in database
         try:
-            error_message = ChatMessage(
-                conversation_id=conversation_id,
-                message_type=ChatMessageType.agent,
-                content="I apologize, but I encountered an error processing your message. Please try again.",
-                user_id=user_id
-            )
+            error_message = ChatMessage(conversation_id=conversation_id, message_type=ChatMessageType.agent, content="I apologize, but I encountered an error processing your message. Please try again.", user_id=user_id)
             db.add(error_message)
             db.commit()
 
             # Try to broadcast error message
             try:
                 channel = f"conversation:{conversation_id}:messages"
-                error_data = {
-                    "type": "chat_message",
-                    "conversation_id": conversation_id,
-                    "message": {
-                        "id": str(error_message.id),
-                        "content": error_message.content,
-                        "message_type": "agent",
-                        "created_at": error_message.created_at.isoformat(),
-                        "error": True
-                    }
-                }
+                error_data = {"type": "chat_message", "conversation_id": conversation_id, "message": {"id": str(error_message.id), "content": error_message.content, "message_type": "agent", "created_at": error_message.created_at.isoformat(), "error": True}}
 
                 # Use sync Redis client for error broadcasting
                 result = sync_redis_client.publish(channel, json.dumps(error_data))
@@ -172,5 +137,3 @@ def process_chat_message(self, conversation_id: str, user_message_id: str, conte
         # Cleanup database session
         db.close()
         logger.info(f"Background task completed for conversation_id={conversation_id}")
-
-

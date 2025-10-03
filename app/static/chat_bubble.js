@@ -9,6 +9,7 @@ class ChatApp {
         this.currentTaskId = null;
 
         this.initializeElements();
+        this.initializeMentions();
         this.bindEvents();
         this.updateConnectionStatus('disconnected'); // Initial status
         this.loadConversations();
@@ -32,6 +33,10 @@ class ChatApp {
         this.conversationTitle = document.getElementById('conversation-title');
         this.connectionStatus = document.getElementById('connection-status');
         this.typingIndicator = document.getElementById('typing-indicator');
+    }
+
+    initializeMentions() {
+        this.mentionRegex = /@(\w+):([a-f0-9-]+)/g;  // Regex for @meeting:uuid pattern
     }
 
     bindEvents() {
@@ -314,7 +319,7 @@ class ChatApp {
 
         const errorClass = isError ? 'error-message' : '';
         messageEl.innerHTML = `
-            <div class="message-content ${errorClass}">${this.escapeHtml(message.content)}</div>
+            <div class="message-content ${errorClass}">${this.highlightMentionsInContent(message.content)}</div>
             <div class="message-time">${timestamp}</div>
         `;
 
@@ -325,6 +330,18 @@ class ChatApp {
     async sendMessage() {
         const content = this.messageInput?.value?.trim();
         if (!content || !this.currentConversationId) return;
+
+        // Parse mentions from content
+        const mentions = [];
+        let match;
+        while ((match = this.mentionRegex.exec(content)) !== null) {
+            mentions.push({
+                entity_type: match[1],  // 'meeting'
+                entity_id: match[2],    // 'uuid'
+                offset_start: match.index,
+                offset_end: match.index + match[0].length
+            });
+        }
 
         // Clear input immediately
         if (this.messageInput) {
@@ -356,7 +373,7 @@ class ChatApp {
                 },
                 body: JSON.stringify({
                     content: content,
-                    mentions: [] // For now, no mentions support in UI
+                    mentions: mentions  // Send parsed mentions
                 })
             });
 
@@ -569,6 +586,11 @@ class ChatApp {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    highlightMentionsInContent(text) {
+        const escaped = this.escapeHtml(text);
+        return escaped.replace(this.mentionRegex, '<span class="mention">$&</span>');
     }
 }
 

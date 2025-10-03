@@ -11,9 +11,13 @@ class QdrantClientManager:
 
     def get_client(self) -> QdrantClient:
         """Get or create Qdrant client instance"""
-        if self._client is None:
+        api_key = getattr(settings, 'QDRANT_API_KEY', None)
+        print(api_key)
+        if api_key:
+            self._client = QdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT, api_key=api_key, timeout=30.0)
+        else:
             self._client = QdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT, timeout=30.0)
-            print("🟢 \033[92mQdrant client connected\033[0m")
+        print("🟢 \033[92mQdrant client connected\033[0m")
         return self._client
 
     def health_check(self) -> bool:

@@ -4,9 +4,9 @@ from typing import List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.models.chat import ChatMessage, Conversation, ChatMessageType
-from app.schemas.conversation import ConversationCreate, ConversationUpdate
+from app.models.chat import ChatMessage, Conversation
 from app.schemas.chat import ChatMessageResponse
+from app.schemas.conversation import ConversationCreate, ConversationUpdate
 
 
 def create_conversation(db: Session, user_id: uuid.UUID, conversation_data: ConversationCreate) -> Conversation:

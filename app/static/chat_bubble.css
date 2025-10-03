@@ -465,3 +465,12 @@ body {
     font-style: italic;
     opacity: 0.8;
 }
+
+/* Mention styling */
+.mention {
+    background-color: #e3f2fd;
+    color: #1976d2;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-weight: bold;
+}
