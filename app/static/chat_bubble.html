@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Application</title>
+    <link rel="stylesheet" href="./chat_bubble.css">
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Conversations Sidebar -->
+        <div class="conversations-sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">Conversations</div>
+                <div class="user-id-input-container">
+                    <label for="user-id-input">User ID:</label>
+                    <div class="user-id-input-wrapper">
+                        <input
+                            type="text"
+                            id="user-id-input"
+                            placeholder="Enter your user ID"
+                            value="4c3b4f0f-8d99-42cd-9676-8a16a974c507"
+                            class="user-id-input"
+                        />
+                        <button type="button" id="generate-uuid-btn" class="generate-uuid-btn" title="Generate Random UUID">
+                            🎲
+                        </button>
+                    </div>
+                </div>
+                <button class="new-chat-btn" id="new-chat-btn">
+                    + New Chat
+                </button>
+            </div>
+            <div class="conversations-list" id="conversations-list">
+                <!-- Conversations will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="chat-main">
+            <!-- Chat Header -->
+            <div class="chat-header">
+                <div class="conversation-title-display" id="conversation-title">
+                    <div class="connection-status disconnected" id="connection-status" title="Connection Status"></div>
+                    <span>Select a conversation to start chatting</span>
+                </div>
+            </div>
+
+            <!-- Chat Messages -->
+            <div class="chat-messages" id="chat-messages">
+                <div class="messages-container">
+                    <!-- Messages will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Typing Indicator -->
+            <div class="typing-indicator" id="typing-indicator">
+                AI is typing...
+            </div>
+
+            <!-- Message Input Area -->
+            <div class="message-input-area">
+                <div class="message-input-container">
+                    <textarea
+                        class="message-input"
+                        id="message-input"
+                        placeholder="Type your message here... (Press Enter to send, Shift+Enter for new line)"
+                        rows="1"
+                    ></textarea>
+                    <button class="send-btn" id="send-btn">
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden container for chat functionality -->
+    <div id="chat-container" style="display: none;"></div>
+
+    <script src="./chat_bubble.js"></script>
+</body>
+</html>
