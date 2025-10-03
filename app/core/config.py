@@ -1,4 +1,3 @@
-import os
 from typing import Annotated
 
 from pydantic import (
@@ -22,7 +21,7 @@ class Settings(BaseSettings):
     # Server Configuration
     SERVER_NAME: str = "SecureScribeBE"
     SERVER_HOST: str = "http://localhost"
-    SERVER_PORT: int = 8000
+    SERVER_PORT: int = 9999
 
     # CORS Configuration
     BACKEND_CORS_ORIGINS: Annotated[

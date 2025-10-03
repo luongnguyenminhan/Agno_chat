@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import FileResponse
@@ -49,7 +49,7 @@ def custom_openapi():
 
     # Add custom servers for different environments
     openapi_schema["servers"] = [
-        {"url": "http://localhost:8000", "description": "Development server"},
+        {"url": "http://localhost:9999", "description": "Development server"},
         {"url": "https://api.securescribe.com", "description": "Production server"},
     ]
 
@@ -131,15 +131,34 @@ app.include_router(api_router)
 # Mount static files AFTER API router to avoid conflicts
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
+# Serve chat application files directly for easier access
+@app.get("/chat/css", response_class=FileResponse)
+def serve_chat_css():
+    """Serve chat_bubble.css file directly"""
+    file_path = os.path.join("app", "static", "chat_bubble.css")
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type="text/css")
+    else:
+        raise HTTPException(status_code=404, detail="chat_bubble.css not found")
 
-@app.get("/firebase-messaging-sw.js")
-def get_firebase_service_worker():
-    """Serve Firebase service worker file"""
-    file_path = "firebase-messaging-sw.js"
+@app.get("/chat/js", response_class=FileResponse)
+def serve_chat_js():
+    """Serve chat_bubble.js file directly"""
+    file_path = os.path.join("app", "static", "chat_bubble.js")
     if os.path.exists(file_path):
         return FileResponse(file_path, media_type="application/javascript")
     else:
-        raise HTTPException(status_code=404, detail="Service worker not found")
+        raise HTTPException(status_code=404, detail="chat_bubble.js not found")
+
+# Combined chat application endpoint
+@app.get("/chat")
+def serve_chat_app():
+    """Serve the complete chat application"""
+    file_path = os.path.join("app", "static", "chat_bubble.html")
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type="text/html")
+    else:
+        raise HTTPException(status_code=404, detail="chat_bubble.html not found")
 
 
 @app.get("/health")

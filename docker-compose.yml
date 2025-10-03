@@ -18,7 +18,7 @@ services:
 
   celery_worker:
     image: securescribe-api
-    command: celery -A app.jobs.celery_worker worker --loglevel=info
+    command: celery -A app.jobs.celery_worker worker --loglevel=info --concurrency=2
     env_file:
       - .env
     volumes:

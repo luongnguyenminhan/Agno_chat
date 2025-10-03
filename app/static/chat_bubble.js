@@ -3,7 +3,7 @@ class ChatApp {
         this.currentConversationId = null;
         this.eventSource = null;
         this.userId = this.getUserId();
-        this.apiBase = 'http://localhost:8000/api/v1';
+        this.apiBase = '/api/v1';
         this.conversations = [];
         this.messages = [];
         this.currentTaskId = null;

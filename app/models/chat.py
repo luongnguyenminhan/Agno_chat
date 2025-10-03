@@ -3,9 +3,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from typing import ClassVar
-
-from sqlalchemy import JSON, Boolean, Column, DateTime, String, Text, func, select
+from sqlalchemy import JSON, Boolean, Column, DateTime, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import object_session
