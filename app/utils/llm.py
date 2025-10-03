@@ -5,6 +5,7 @@ from agno.agent import Agent
 from agno.db.postgres import PostgresDb
 from agno.models.google import Gemini
 from agno.models.message import Message
+from chonkie import GeminiEmbeddings
 
 from app.core.config import settings
 from app.db import SessionLocal
@@ -31,6 +32,21 @@ def _get_model() -> Gemini:
         api_key=settings.GOOGLE_API_KEY,
     )
 
+def _get_embeddings() -> GeminiEmbeddings:
+    return GeminiEmbeddings(api_key=settings.GOOGLE_API_KEY)
+
+async def embed_query(query: str) -> List[float]:
+    embeddings = _get_embeddings()
+    vector = embeddings.embed(query)
+    return list(vector)
+
+
+async def embed_documents(docs: List[str]) -> List[List[float]]:
+    if not docs:
+        return []
+    embeddings = _get_embeddings()
+    vectors = embeddings.embed_batch(docs)
+    return [list(v) for v in vectors]
 
 def get_agno_postgres_db() -> PostgresDb:
     """Get agno PostgresDb instance for session management"""

@@ -4,7 +4,7 @@ class ChatApp {
         this.connectedConversationId = null; // Track which conversation is currently connected to SSE
         this.eventSource = null;
         this.userId = this.getUserId();
-        this.apiBase = 'http://localhost:9999/api/v1';
+        this.apiBase = '/api/v1';
         this.conversations = [];
         this.messages = [];
         this.currentTaskId = null;
@@ -34,6 +34,21 @@ class ChatApp {
         this.conversationTitle = document.getElementById('conversation-title');
         this.connectionStatus = document.getElementById('connection-status');
         this.typingIndicator = document.getElementById('typing-indicator');
+
+        // Meeting index modal elements
+        this.indexMeetingBtn = document.getElementById('index-meeting-btn');
+        this.meetingModalOverlay = document.getElementById('meeting-modal-overlay');
+        this.meetingModalClose = document.getElementById('meeting-modal-close');
+        this.cancelMeetingIndex = document.getElementById('cancel-meeting-index');
+        this.meetingIndexForm = document.getElementById('meeting-index-form');
+        this.submitMeetingIndex = document.getElementById('submit-meeting-index');
+        this.meetingIdInput = document.getElementById('meeting-id');
+        this.generateMeetingUuidBtn = document.getElementById('generate-meeting-uuid-btn');
+        this.meetingTranscriptInput = document.getElementById('meeting-transcript');
+        this.meetingNotesFileInput = document.getElementById('meeting-notes-file');
+        this.userIdDisplay = document.getElementById('user-id-display');
+        this.fileNameDisplay = document.getElementById('file-name');
+        this.indexStatus = document.getElementById('index-status');
     }
 
     initializeMentions() {
@@ -80,6 +95,40 @@ class ChatApp {
 
         // Generate UUID button
         this.generateUuidBtn?.addEventListener('click', () => this.generateRandomUuid());
+
+        // Meeting index modal events
+        this.indexMeetingBtn?.addEventListener('click', () => this.openMeetingIndexModal());
+        this.meetingModalClose?.addEventListener('click', () => this.closeMeetingIndexModal());
+        this.cancelMeetingIndex?.addEventListener('click', () => this.closeMeetingIndexModal());
+        this.generateMeetingUuidBtn?.addEventListener('click', () => this.generateMeetingUuid());
+        this.meetingModalOverlay?.addEventListener('click', (e) => {
+            if (e.target === this.meetingModalOverlay) {
+                this.closeMeetingIndexModal();
+            }
+        });
+        this.meetingIndexForm?.addEventListener('submit', (e) => this.handleMeetingIndexSubmit(e));
+        this.meetingNotesFileInput?.addEventListener('change', (e) => this.handleFileSelection(e));
+
+        // Drag and drop for file upload
+        const fileUploadArea = document.querySelector('.file-upload-area');
+        if (fileUploadArea) {
+            fileUploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fileUploadArea.classList.add('drag-over');
+            });
+            fileUploadArea.addEventListener('dragleave', () => {
+                fileUploadArea.classList.remove('drag-over');
+            });
+            fileUploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileUploadArea.classList.remove('drag-over');
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && this.meetingNotesFileInput) {
+                    this.meetingNotesFileInput.files = files;
+                    this.handleFileSelection({ target: { files } });
+                }
+            });
+        }
 
         // Page visibility change handler
         document.addEventListener('visibilitychange', () => this.handleVisibilityChange());
@@ -613,6 +662,144 @@ class ChatApp {
     highlightMentionsInContent(text) {
         const escaped = this.escapeHtml(text);
         return escaped.replace(this.mentionRegex, '<span class="mention">$&</span>');
+    }
+
+    openMeetingIndexModal() {
+        if (!this.meetingModalOverlay) return;
+
+        // Set current user ID in the form
+        if (this.userIdDisplay) {
+            this.userIdDisplay.value = this.userId;
+        }
+
+        // Reset form
+        if (this.meetingIndexForm) {
+            this.meetingIndexForm.reset();
+        }
+        if (this.fileNameDisplay) {
+            this.fileNameDisplay.textContent = '';
+        }
+        if (this.indexStatus) {
+            this.indexStatus.textContent = '';
+            this.indexStatus.className = 'index-status';
+        }
+
+        // Show modal
+        this.meetingModalOverlay.style.display = 'flex';
+    }
+
+    closeMeetingIndexModal() {
+        if (!this.meetingModalOverlay) return;
+
+        // Hide modal
+        this.meetingModalOverlay.style.display = 'none';
+
+        // Reset form
+        if (this.meetingIndexForm) {
+            this.meetingIndexForm.reset();
+        }
+        if (this.fileNameDisplay) {
+            this.fileNameDisplay.textContent = '';
+        }
+        if (this.indexStatus) {
+            this.indexStatus.textContent = '';
+            this.indexStatus.className = 'index-status';
+        }
+    }
+
+    handleFileSelection(event) {
+        const file = event.target.files[0];
+        if (file && this.fileNameDisplay) {
+            this.fileNameDisplay.textContent = file.name;
+        } else if (this.fileNameDisplay) {
+            this.fileNameDisplay.textContent = '';
+        }
+    }
+
+    async handleMeetingIndexSubmit(event) {
+        event.preventDefault();
+
+        const meetingId = this.meetingIdInput?.value?.trim();
+        const transcript = this.meetingTranscriptInput?.value?.trim();
+        const file = this.meetingNotesFileInput?.files[0];
+
+        if (!meetingId) {
+            this.showIndexStatus('Please enter a meeting ID', 'error');
+            return;
+        }
+
+        if (!transcript && !file) {
+            this.showIndexStatus('Please provide either transcript or meeting notes file', 'error');
+            return;
+        }
+
+        // Disable submit button during processing
+        if (this.submitMeetingIndex) {
+            this.submitMeetingIndex.disabled = true;
+            this.submitMeetingIndex.textContent = 'Indexing...';
+        }
+
+        this.showIndexStatus('Indexing meeting content...', 'info');
+
+        try {
+            const formData = new FormData();
+            formData.append('meeting_id', meetingId);
+            formData.append('current_user_id', this.userId);
+
+            if (transcript) {
+                formData.append('transcript', transcript);
+            }
+
+            if (file) {
+                formData.append('meeting_note_file', file);
+            }
+
+            const response = await fetch(`${this.apiBase}/meetings/index`, {
+                method: 'POST',
+                headers: {
+                    'current-user-id': this.userId
+                },
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                this.showIndexStatus(`Successfully indexed meeting: ${result.data.processed_items.join(', ')}`, 'success');
+                setTimeout(() => {
+                    this.closeMeetingIndexModal();
+                }, 2000);
+            } else {
+                throw new Error(result.message || 'Failed to index meeting');
+            }
+
+        } catch (error) {
+            console.error('Error indexing meeting:', error);
+            this.showIndexStatus(`Error: ${error.message}`, 'error');
+        } finally {
+            // Re-enable submit button
+            if (this.submitMeetingIndex) {
+                this.submitMeetingIndex.disabled = false;
+                this.submitMeetingIndex.textContent = 'Index Meeting';
+            }
+        }
+    }
+
+    generateMeetingUuid() {
+        // Generate a random UUID v4 for meeting ID
+        const uuid = this.generateUUIDv4();
+
+        // Set the UUID in the meeting ID input field
+        if (this.meetingIdInput) {
+            this.meetingIdInput.value = uuid;
+        }
+    }
+
+    showIndexStatus(message, type) {
+        if (!this.indexStatus) return;
+
+        this.indexStatus.textContent = message;
+        this.indexStatus.className = `index-status ${type}`;
     }
 }
 
