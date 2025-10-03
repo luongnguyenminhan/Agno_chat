@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.chat import ChatMessage, Conversation
 from app.schemas.chat import ChatMessageResponse
+from app.services.qdrant_service import query_documents_by_meeting_id
 
 
 def create_chat_message(db: Session, conversation_id: uuid.UUID, user_id: uuid.UUID, content: str, message_type: str, mentions: Optional[List] = None) -> Optional[ChatMessage]:
@@ -128,37 +129,19 @@ def get_recent_messages(db: Session, conversation_id: uuid.UUID, limit: int = 5)
     return db.query(ChatMessage).filter(ChatMessage.conversation_id == conversation_id).order_by(ChatMessage.created_at.desc()).limit(limit).all()
 
 
-def query_documents_for_mentions(mentions: List[dict], current_user_id: str) -> str:
-    """
-    Query documents based on mentions and print query information.
-    For now, just prints the query structure as requested.
-    """
+async def query_documents_for_mentions(mentions: List[dict]) -> List[dict]:
+    """Query documents based on mentions and return results."""
     if not mentions:
-        return "No mentions found"
+        return []
 
-    print("=== MENTION-BASED QUERY DEBUG ===")
-    print(f"User ID: {current_user_id}")
-    print(f"Number of mentions: {len(mentions)}")
+    results = []
 
-    for i, mention in enumerate(mentions):
-        print(f"Mention {i + 1}:")
-        print(f"  Entity Type: {mention.entity_type}")
-        print(f"  Entity ID: {mention.entity_id}")
-        print(f"  Offset: {mention.offset_start}-{mention.offset_end}")
-
-        # Here we would query the actual documents based on entity type and ID
-        # For now, just print what would be queried
+    for mention in mentions:
         entity_type = mention.entity_type
         entity_id = mention.entity_id
 
-        if entity_type == "project":
-            print(f"  -> Would query project documents for project_id: {entity_id}")
-        elif entity_type == "meeting":
-            print(f"  -> Would query meeting documents for meeting_id: {entity_id}")
-        elif entity_type == "file":
-            print(f"  -> Would query file content for file_id: {entity_id}")
+        if entity_type == "meeting":
+            meeting_docs = await query_documents_by_meeting_id(entity_id, top_k=5)
+            results.extend(meeting_docs)
 
-    print(f"  -> Would also include user's personal documents (user_id: {current_user_id})")
-    print("=== END QUERY DEBUG ===")
-
-    return f"Processed {len(mentions)} mentions for query"
+    return results

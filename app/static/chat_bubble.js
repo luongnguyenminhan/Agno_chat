@@ -1,9 +1,10 @@
 class ChatApp {
     constructor() {
         this.currentConversationId = null;
+        this.connectedConversationId = null; // Track which conversation is currently connected to SSE
         this.eventSource = null;
         this.userId = this.getUserId();
-        this.apiBase = '/api/v1';
+        this.apiBase = 'http://localhost:9999/api/v1';
         this.conversations = [];
         this.messages = [];
         this.currentTaskId = null;
@@ -94,6 +95,7 @@ class ChatApp {
 
         // Reset current conversation and messages
         this.currentConversationId = null;
+        this.connectedConversationId = null;
         this.messages = [];
         this.currentTaskId = null;
 
@@ -220,14 +222,13 @@ class ChatApp {
                 const conversation = data.data;
 
                 this.currentConversationId = conversationId;
+                this.connectedConversationId = null; // Reset connected conversation when loading new one
                 this.currentTaskId = null;
 
                 // Hide typing indicator when loading new conversation
                 this.hideTypingIndicator();
 
-                // Load messages with proper format (clear any temporary messages first)
-                this.messages = this.messages.filter(msg => !msg.isTemporary);
-
+                // Load messages with proper format
                 if (conversation.messages && conversation.messages.length > 0) {
                     const loadedMessages = conversation.messages.map(msg => ({
                         id: msg.id,
@@ -238,14 +239,14 @@ class ChatApp {
 
                     // Merge loaded messages with existing ones, avoiding duplicates
                     loadedMessages.forEach(loadedMsg => {
-                        const existingMsg = this.messages.find(msg =>
-                            msg.id === loadedMsg.id ||
-                            (msg.content === loadedMsg.content && msg.message_type === loadedMsg.message_type)
-                        );
+                        const existingMsg = this.messages.find(msg => msg.id === loadedMsg.id);
                         if (!existingMsg) {
                             this.messages.push(loadedMsg);
                         }
                     });
+
+                    // Sort messages by creation time
+                    this.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
                 }
 
                 // Update active conversation in sidebar
@@ -433,9 +434,10 @@ class ChatApp {
     disconnectSSE() {
         // Close existing SSE connection if it exists
         if (this.eventSource) {
-            console.log(`Disconnecting SSE for conversation: ${this.currentConversationId}`);
+            console.log(`Disconnecting SSE for conversation: ${this.connectedConversationId || this.currentConversationId}`);
             this.eventSource.close();
             this.eventSource = null;
+            this.connectedConversationId = null;
             this.updateConnectionStatus('disconnected');
         }
         // Hide typing indicator when disconnecting
@@ -443,19 +445,28 @@ class ChatApp {
     }
 
     connectSSE(conversationId) {
-        // Disconnect any existing SSE connection first
-        this.disconnectSSE();
-
-        // Only connect if this is the currently selected conversation
+        // Only connect if this is the currently selected conversation and not already connected to it
         if (this.currentConversationId !== conversationId) {
             console.log(`Skipping SSE connection for conversation ${conversationId} - not currently selected`);
             return;
         }
 
+        // If already connected to this conversation, skip
+        if (this.connectedConversationId === conversationId && this.eventSource) {
+            console.log(`Already connected to SSE for conversation: ${conversationId}`);
+            return;
+        }
+
+        // Disconnect any existing SSE connection first
+        this.disconnectSSE();
+
         console.log(`Connecting SSE for conversation: ${conversationId}`);
 
         // Connect to SSE endpoint
         this.eventSource = new EventSource(`${this.apiBase}/conversations/${conversationId}/events`);
+
+        // Update tracking
+        this.connectedConversationId = conversationId;
 
         // Update connection status to connected
         this.updateConnectionStatus('connected');
@@ -475,10 +486,7 @@ class ChatApp {
                     this.hideTypingIndicator();
 
                     // Check if message already exists to prevent duplicates
-                    const existingMessage = this.messages.find(msg =>
-                        msg.id === data.message.id ||
-                        (msg.content === data.message.content && msg.message_type === data.message.message_type)
-                    );
+                    const existingMessage = this.messages.find(msg => msg.id === data.message.id);
                     if (!existingMessage) {
                         // Ensure proper format
                         const formattedMessage = {

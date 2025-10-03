@@ -74,3 +74,18 @@ class ConversationWithMessagesApiResponse(BaseModel):
     success: bool
     message: str
     data: ConversationWithMessagesResponse
+
+
+class MeetingIndexRequest(BaseModel):
+    """Schema for meeting indexing request"""
+
+    meeting_id: str
+    transcript: Optional[str] = None
+
+
+class MeetingIndexResponse(BaseModel):
+    """Schema for meeting indexing response"""
+
+    success: bool
+    message: str
+    data: dict

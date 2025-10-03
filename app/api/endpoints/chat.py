@@ -45,12 +45,13 @@ async def send_chat_message_endpoint(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    # Handle mention-based querying (for now just prints as requested)
+    # Handle mention-based querying and get query results for context
+    query_results = []
     if message_data.mentions:
-        query_documents_for_mentions(message_data.mentions, str(current_user_id))
+        query_results = await query_documents_for_mentions(message_data.mentions)
 
-    # Trigger background AI processing task
-    task = process_chat_message.delay(conversation_id=str(conversation_id), user_message_id=str(user_message.id), content=message_data.content, user_id=current_user_id)
+    # Trigger background AI processing task with query results for context
+    task = process_chat_message.delay(conversation_id=str(conversation_id), user_message_id=str(user_message.id), content=message_data.content, user_id=current_user_id, query_results=query_results)
 
     print(f"Triggered background task {task.id} for conversation_id={conversation_id}")
 

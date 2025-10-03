@@ -1,9 +1,7 @@
-import asyncio
 import json
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-import redis
 from agno.models.message import Message
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -43,7 +41,7 @@ def fetch_conversation_history_sync(conversation_id: str, limit: int = 10) -> Li
 
 
 @celery_app.task(bind=True)
-def process_chat_message(self, conversation_id: str, user_message_id: str, content: str, user_id: str) -> Dict[str, Any]:
+def process_chat_message(self, conversation_id: str, user_message_id: str, content: str, user_id: str, query_results: Optional[List[dict]] = None) -> Dict[str, Any]:
     """
     Process chat message in background and broadcast response via SSE.
 
@@ -67,8 +65,17 @@ def process_chat_message(self, conversation_id: str, user_message_id: str, conte
         history = fetch_conversation_history_sync(conversation_id)
         logger.info(f"Fetched conversation history for conversation_id={conversation_id}, history_length={len(history) if history else 0}")
 
+        # Prepare enhanced content with meeting documents if available
+        enhanced_content = content
+        if query_results:
+            meeting_context = "\n\nThông tin từ tài liệu cuộc họp được tìm thấy:\n"
+            for i, doc in enumerate(query_results[:3]):  # Limit to 3 documents for context
+                meeting_context += f"\nTài liệu {i+1}:\n{doc.get('payload', {}).get('text', 'Nội dung không có sẵn')}\n"
+            enhanced_content = content + meeting_context
+            logger.info(f"Enhanced content with {len(query_results)} meeting documents for conversation_id={conversation_id}")
+
         # Process message with AI agent
-        response = agent.run(content, history=history)
+        response = agent.run(enhanced_content, history=history)
         logger.info(f"Agent generated response for conversation_id={conversation_id}")
 
         ai_response_content = response.content
