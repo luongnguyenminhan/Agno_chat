@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     QDRANT_API_KEY: str = ""
 
     # Google AI Configuration
-    GOOGLE_API_KEY: str = "AIzaSyDKJL5HLh3syVxysfjFkBdqrJaY9dLXc_A"
+    GOOGLE_API_KEY: str = ""
 
     # Indexing Configuration
 
