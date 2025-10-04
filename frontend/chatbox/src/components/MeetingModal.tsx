@@ -21,10 +21,10 @@ import type { UserContextType } from '../contexts/userContext.types';
 
 const useStyles = makeStyles({
     modal: {
-        maxWidth: '600px',
-        width: '90vw',
-        minWidth: '320px',
-        maxHeight: '90vh',
+        maxWidth: '700px',
+        width: '95vw',
+        minWidth: '400px',
+        maxHeight: '85vh',
         overflowY: 'auto',
     },
     modalMobile: {
@@ -35,32 +35,37 @@ const useStyles = makeStyles({
         borderRadius: '0',
     },
     formGroup: {
-        marginBottom: tokens.spacingVerticalL,
+        marginBottom: tokens.spacingVerticalXL,
     },
     formLabel: {
         display: 'block',
-        marginBottom: tokens.spacingVerticalXXS,
+        marginBottom: tokens.spacingVerticalS,
         fontWeight: tokens.fontWeightMedium,
         color: tokens.colorNeutralForeground1,
         fontSize: tokens.fontSizeBase300,
     },
     inputWithButton: {
         display: 'flex',
-        gap: tokens.spacingHorizontalXS,
+        gap: tokens.spacingHorizontalS,
         alignItems: 'stretch',
+        width: '100%',
+    },
+    inputFlex: {
+        flex: 1,
     },
     generateUuidBtn: {
         backgroundColor: tokens.colorNeutralBackground3,
         border: `1px solid ${tokens.colorNeutralStroke2}`,
         color: tokens.colorNeutralForeground1,
-        padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalS}`,
+        padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
         borderRadius: tokens.borderRadiusMedium,
         cursor: 'pointer',
         transition: `all ${tokens.durationNormal}`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        minWidth: '44px',
+        minWidth: '50px',
+        flexShrink: 0,
         ':hover': {
             backgroundColor: tokens.colorNeutralBackground4,
         },
@@ -68,10 +73,17 @@ const useStyles = makeStyles({
     fileUploadArea: {
         border: `2px dashed ${tokens.colorNeutralStroke2}`,
         borderRadius: tokens.borderRadiusMedium,
-        padding: tokens.spacingVerticalXL,
+        padding: tokens.spacingVerticalXXL,
         textAlign: 'center',
         transition: `border-color ${tokens.durationNormal}`,
         cursor: 'pointer',
+        position: 'relative',
+        minHeight: '120px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: tokens.spacingVerticalS,
     },
     fileUploadAreaHover: {
         // borderColor: '#0366d6',
@@ -82,18 +94,23 @@ const useStyles = makeStyles({
     },
     uploadIcon: {
         fontSize: tokens.fontSizeBase600,
-        marginBottom: tokens.spacingVerticalXS,
+        marginBottom: tokens.spacingVerticalXXS,
         display: 'block',
     },
     fileName: {
-        marginTop: tokens.spacingVerticalXS,
+        marginTop: tokens.spacingVerticalS,
         fontWeight: tokens.fontWeightMedium,
         color: tokens.colorNeutralForeground1,
+        fontSize: tokens.fontSizeBase200,
     },
     indexStatus: {
         textAlign: 'center',
-        minHeight: '20px',
+        minHeight: '24px',
         fontSize: tokens.fontSizeBase300,
+        marginTop: tokens.spacingVerticalM,
+        padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalM}`,
+        borderRadius: tokens.borderRadiusSmall,
+        backgroundColor: tokens.colorNeutralBackground2,
     },
     indexStatusSuccess: {
         color: tokens.colorStatusSuccessForeground1,
@@ -103,6 +120,11 @@ const useStyles = makeStyles({
     },
     indexStatusInfo: {
         color: tokens.colorBrandForeground1,
+    },
+    dialogActions: {
+        paddingTop: tokens.spacingVerticalL,
+        gap: tokens.spacingHorizontalM,
+        justifyContent: 'flex-end',
     },
 });
 
@@ -220,6 +242,7 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
                             <label className={styles.formLabel} htmlFor="meeting-id">Meeting ID:</label>
                             <div className={styles.inputWithButton}>
                                 <Input
+                                    className={styles.inputFlex}
                                     id="meeting-id"
                                     value={meetingId}
                                     onChange={(_, data) => setMeetingId(data.value)}
@@ -244,7 +267,9 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
                                 value={transcript}
                                 onChange={(_, data) => setTranscript(data.value)}
                                 placeholder="Paste the meeting transcript here..."
-                                rows={6}
+                                rows={8}
+                                resize="vertical"
+                                style={{ width: '100%' }}
                             />
                         </div>
 
@@ -262,6 +287,9 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
                             >
                                 <span className={styles.uploadIcon}>📎</span>
                                 <Text>Click to select or drag and drop a file</Text>
+                                <Text style={{ fontSize: tokens.fontSizeBase200, opacity: 0.7 }}>
+                                    Supports: .txt, .pdf, .doc, .docx
+                                </Text>
                                 <input
                                     id="notes-file"
                                     type="file"
@@ -270,27 +298,29 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
                                     accept=".txt,.pdf,.doc,.docx"
                                 />
                                 {notesFile && (
-                                    <div className={styles.fileName}>{notesFile.name}</div>
+                                    <div className={styles.fileName}>
+                                        Selected: {notesFile.name}
+                                    </div>
                                 )}
                             </div>
                         </div>
 
-                        <div className={styles.indexStatus}>
-                            {indexStatus && (
+                        {indexStatus && (
+                            <div className={styles.indexStatus}>
                                 <Text className={
                                     indexStatus.includes('successfully')
                                         ? styles.indexStatusSuccess
-                                        : indexStatus.includes('error')
+                                        : indexStatus.includes('error') || indexStatus.includes('Error')
                                             ? styles.indexStatusError
                                             : styles.indexStatusInfo
                                 }>
                                     {indexStatus}
                                 </Text>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </DialogContent>
-                    <DialogActions>
-                        <Button appearance="secondary" onClick={handleCancel}>
+                    <DialogActions className={styles.dialogActions}>
+                        <Button appearance="secondary" onClick={handleCancel} disabled={isSubmitting}>
                             Cancel
                         </Button>
                         <Button appearance="primary" onClick={handleSubmit} disabled={!meetingId || isSubmitting}>

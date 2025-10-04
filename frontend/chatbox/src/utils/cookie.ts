@@ -1,5 +1,4 @@
 import Cookies from 'js-cookie';
-
 const USER_ID_COOKIE_KEY = 'chat_user_id';
 const COOKIE_EXPIRES_DAYS = 30;
 

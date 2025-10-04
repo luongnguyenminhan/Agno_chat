@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Floating Chatbox</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    /* bubble tròn */
+    .chat-bubble {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background-color: #4CAF50;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+      z-index: 1000;
+    }
+    /* chatbox popup */
+    .chat-popup {
+      position: fixed;
+      bottom: 90px;
+      right: 20px;
+      width: 500px;
+      height: 800px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      overflow: hidden;
+      display: none;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      z-index: 1000;
+    }
+    .chat-popup iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="chat-bubble" id="chatToggle">💬</div>
+
+  <div class="chat-popup" id="chatBox">
+    <iframe src="http://localhost:3000"></iframe>
+  </div>
+
+  <script>
+    const chatToggle = document.getElementById("chatToggle");
+    const chatBox = document.getElementById("chatBox");
+
+    chatToggle.addEventListener("click", () => {
+      if (chatBox.style.display === "none" || chatBox.style.display === "") {
+        chatBox.style.display = "block";
+      } else {
+        chatBox.style.display = "none";
+      }
+    });
+  </script>
+</body>
+</html>

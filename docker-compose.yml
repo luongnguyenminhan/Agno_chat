@@ -1,18 +1,7 @@
 version: '3.8'
 
 services:
-  # Frontend Build Service
-  frontend_build:
-    build:
-      context: ./frontend/chatbox
-      dockerfile: Dockerfile
-    volumes:
-      - ./Agno_chat/app/static:/build_output
-    command: sh -c "npm run build:static && echo 'Frontend built and copied to static/'"
-    networks:
-      - securescribe-net
 
-  # Chat API Service (Agno_chat)
   chat_api:
     build: ./Agno_chat
     image: securescribe-chat-api
@@ -22,17 +11,13 @@ services:
       - .env
     volumes:
       - ./Agno_chat:/app
-      - /app/__pycache__
-      - ./Agno_chat/app/static:/app/static:ro
     restart: unless-stopped
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app
     networks:
       - securescribe-net
     depends_on:
       - redis
-      - frontend_build
 
-  # Chat Celery Worker
   chat_worker:
     image: securescribe-chat-api
     command: celery -A app.jobs.celery_worker worker --loglevel=info --concurrency=2
@@ -46,7 +31,6 @@ services:
     depends_on:
       - redis
 
-  # Speech-to-Text API Service
   s2t_api:
     build: ./Speech_to_text
     image: securescribe-s2t-api
@@ -56,7 +40,6 @@ services:
       - .env
     volumes:
       - ./Speech_to_text:/app
-      - /app/__pycache__
       - shared_temp:/tmp
     restart: unless-stopped
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app
@@ -65,7 +48,6 @@ services:
     depends_on:
       - redis
 
-  # Speech-to-Text Celery Worker
   s2t_worker:
     image: securescribe-s2t-api
     command: celery -A app.jobs.celery_worker worker --loglevel=info --concurrency=2
@@ -80,7 +62,6 @@ services:
     depends_on:
       - redis
 
-  # Redis Service (shared between both applications)
   redis:
     image: redis:alpine
     ports:

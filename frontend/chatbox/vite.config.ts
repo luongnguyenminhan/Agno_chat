@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   // Define API base URL from environment or default
-  const apiBaseUrl = env.VITE_API_BASE_URL || 'http://localhost:8000'
+  const apiBaseUrl = env.VITE_API_BASE_URL || 'http://localhost:9999'
 
   // Log current mode and API URL for debugging
   console.log(`[Vite Config] Mode: ${mode}`)
@@ -29,14 +29,40 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: (id) => {
+            // React and core dependencies
             if (id.includes('node_modules')) {
               if (id.includes('react') || id.includes('react-dom')) {
-                return 'vendor';
+                return 'react-vendor';
               }
-              if (id.includes('react-router')) {
-                return 'router';
+              // Fluent UI components
+              if (id.includes('@fluentui')) {
+                return 'fluent-ui';
               }
+              // Markdown and syntax highlighting (heavy libraries)
+              if (id.includes('react-markdown') ||
+                  id.includes('remark-gfm') ||
+                  id.includes('react-syntax-highlighter') ||
+                  id.includes('refractor')) {
+                return 'markdown';
+              }
+              // Other large libraries
+              if (id.includes('next-intl') ||
+                  id.includes('js-cookie') ||
+                  id.includes('react-router')) {
+                return 'utils';
+              }
+              // Everything else goes to vendor
               return 'vendor';
+            }
+            // Application code chunking
+            if (id.includes('src/components/')) {
+              if (id.includes('ChatMessage') || id.includes('MessageCodeBlock')) {
+                return 'chat-components';
+              }
+              return 'ui-components';
+            }
+            if (id.includes('src/services/')) {
+              return 'services';
             }
           },
         },
@@ -45,6 +71,8 @@ export default defineConfig(({ mode }) => {
       target: mode === 'standalone' ? 'es2015' : 'esnext',
       // Reduce CSS size for production/standalone
       cssMinify: mode !== 'development',
+      // Increase chunk size warning limit since we're optimizing
+      chunkSizeWarningLimit: 1000,
     },
     server: {
       port: 3000,

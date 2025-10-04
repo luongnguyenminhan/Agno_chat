@@ -1,0 +1,1 @@
+import{t as o}from"./chat-components-DnbStDi2.js";export{o as ChatMessage};

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import {
     Button,
     makeStyles,
@@ -6,9 +7,12 @@ import {
     tokens,
 } from '@fluentui/react-components';
 import { PanelRight24Regular, Send24Regular } from '@fluentui/react-icons';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, Suspense, lazy } from 'react';
 import { apiService } from '../services/api';
 import type { Message } from '../services/api';
+
+// Lazy load the ChatMessage component to reduce initial bundle size
+const ChatMessage = lazy(() => import('./ChatMessage').then(module => ({ default: module.ChatMessage })));
 
 const useStyles = makeStyles({
     chatMain: {
@@ -87,11 +91,6 @@ const useStyles = makeStyles({
         alignSelf: 'flex-start',
         backgroundColor: tokens.colorNeutralBackground3,
         color: tokens.colorNeutralForeground1,
-    },
-    messageTimestamp: {
-        fontSize: tokens.fontSizeBase200,
-        color: tokens.colorNeutralForeground2,
-        alignSelf: 'flex-start',
     },
     typingIndicator: {
         padding: `${tokens.spacingVerticalS} ${tokens.spacingVerticalL}`,
@@ -234,6 +233,17 @@ export const ChatMain: React.FC<ChatMainProps> = ({
         // Parse mentions from content
         const mentions = apiService.parseMentions(content);
 
+        // Create optimistic user message
+        const optimisticMessage: Message = {
+            id: `temp-${Date.now()}`, // Temporary ID
+            message_type: 'user',
+            content,
+            created_at: new Date().toISOString(),
+        };
+
+        // Add message to UI immediately (optimistic update)
+        setMessages(prev => [...prev, optimisticMessage]);
+
         try {
             setIsTyping(true);
             await apiService.sendMessage(activeConversationId, {
@@ -241,10 +251,14 @@ export const ChatMain: React.FC<ChatMainProps> = ({
                 mentions,
             });
 
-            // The real-time update will handle adding the message to the UI
+            // Real-time update will handle the actual message from server
         } catch (error) {
             console.error('Error sending message:', error);
             setIsTyping(false);
+
+            // Remove optimistic message on error
+            setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+
             // Restore the message content if sending failed
             setCurrentMessage(content);
         }
@@ -294,17 +308,16 @@ export const ChatMain: React.FC<ChatMainProps> = ({
             <div className={styles.chatMessages}>
                 <div className={styles.messagesContainer}>
                     {messages.map((message) => (
-                        <div key={message.id} className={styles.messageItem}>
-                            <div
-                                className={`${styles.messageContent} ${message.message_type === 'user' ? styles.messageUser : styles.messageAssistant
-                                    }`}
-                            >
-                                <Text>{message.content}</Text>
+                        <Suspense key={message.id} fallback={
+                            <div style={{ padding: tokens.spacingVerticalM, textAlign: 'center' }}>
+                                Loading message...
                             </div>
-                            <Text className={styles.messageTimestamp}>
-                                {new Date(message.created_at).toLocaleTimeString()}
-                            </Text>
-                        </div>
+                        }>
+                            <ChatMessage
+                                message={message}
+                                user={undefined} // You can pass user data here if available
+                            />
+                        </Suspense>
                     ))}
                     <div ref={messagesEndRef} />
                 </div>
