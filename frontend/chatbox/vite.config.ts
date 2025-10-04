@@ -40,15 +40,15 @@ export default defineConfig(({ mode }) => {
               }
               // Markdown and syntax highlighting (heavy libraries)
               if (id.includes('react-markdown') ||
-                  id.includes('remark-gfm') ||
-                  id.includes('react-syntax-highlighter') ||
-                  id.includes('refractor')) {
+                id.includes('remark-gfm') ||
+                id.includes('react-syntax-highlighter') ||
+                id.includes('refractor')) {
                 return 'markdown';
               }
               // Other large libraries
               if (id.includes('next-intl') ||
-                  id.includes('js-cookie') ||
-                  id.includes('react-router')) {
+                id.includes('js-cookie') ||
+                id.includes('react-router')) {
                 return 'utils';
               }
               // Everything else goes to vendor
