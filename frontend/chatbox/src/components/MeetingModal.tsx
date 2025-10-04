@@ -178,17 +178,17 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
 
     const handleSubmit = async () => {
         if (!meetingId.trim()) {
-            setIndexStatus('Please enter a meeting ID');
+            setIndexStatus('Vui lòng nhập ID cuộc họp');
             return;
         }
 
         if (!transcript.trim() && !notesFile) {
-            setIndexStatus('Please provide either transcript or meeting notes file');
+            setIndexStatus('Vui lòng cung cấp bản ghi hoặc tệp ghi chú cuộc họp');
             return;
         }
 
         setIsSubmitting(true);
-        setIndexStatus('Indexing meeting content...');
+        setIndexStatus('Đang lập chỉ mục nội dung cuộc họp...');
 
         try {
             const response = await apiService.indexMeeting({
@@ -199,7 +199,7 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
             });
 
             if (response.success) {
-                setIndexStatus(`Successfully indexed meeting: ${response.data?.processed_items?.join(', ')}`);
+                setIndexStatus(`Đã lập chỉ mục thành công cuộc họp: ${response.data?.processed_items?.join(', ')}`);
                 setTimeout(() => {
                     onClose();
                     // Reset form
@@ -213,7 +213,7 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
             }
         } catch (error: any) {
             console.error('Error indexing meeting:', error);
-            setIndexStatus(`Error: ${error.message}`);
+            setIndexStatus(`Lỗi: ${error.message}`);
         } finally {
             setIsSubmitting(false);
         }
@@ -236,24 +236,24 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
         <Dialog open={isOpen} onOpenChange={(_, data) => !data.open && onClose()}>
             <DialogSurface className={modalClasses}>
                 <DialogBody>
-                    <DialogTitle>Index Meeting Content</DialogTitle>
+                    <DialogTitle>Lập chỉ mục nội dung cuộc họp</DialogTitle>
                     <DialogContent>
                         <div className={styles.formGroup}>
-                            <label className={styles.formLabel} htmlFor="meeting-id">Meeting ID:</label>
+                            <label className={styles.formLabel} htmlFor="meeting-id">ID cuộc họp:</label>
                             <div className={styles.inputWithButton}>
                                 <Input
                                     className={styles.inputFlex}
                                     id="meeting-id"
                                     value={meetingId}
                                     onChange={(_, data) => setMeetingId(data.value)}
-                                    placeholder="Enter meeting ID (e.g., meeting-123)"
+                                    placeholder="Nhập ID cuộc họp (ví dụ: meeting-123)"
                                     required
                                 />
                                 <button
                                     type="button"
                                     className={styles.generateUuidBtn}
                                     onClick={generateMeetingUuid}
-                                    title="Generate Random UUID"
+                                    title="Tạo UUID ngẫu nhiên"
                                 >
                                     <CubeMultiple24Regular />
                                 </button>
@@ -261,12 +261,12 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
                         </div>
 
                         <div className={styles.formGroup}>
-                            <label className={styles.formLabel} htmlFor="meeting-transcript">Meeting Transcript:</label>
+                            <label className={styles.formLabel} htmlFor="meeting-transcript">Bản ghi cuộc họp:</label>
                             <Textarea
                                 id="meeting-transcript"
                                 value={transcript}
                                 onChange={(_, data) => setTranscript(data.value)}
-                                placeholder="Paste the meeting transcript here..."
+                                placeholder="Dán bản ghi cuộc họp ở đây..."
                                 rows={8}
                                 resize="vertical"
                                 style={{ width: '100%' }}
@@ -274,7 +274,7 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
                         </div>
 
                         <div className={styles.formGroup}>
-                            <label className={styles.formLabel}>Meeting Notes File:</label>
+                            <label className={styles.formLabel}>Tệp ghi chú cuộc họp:</label>
                             <div
                                 className={`${styles.fileUploadArea} ${isDragOver ? styles.fileUploadAreaDragOver : ''}`}
                                 onDrop={handleFileDrop}
@@ -286,9 +286,9 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
                                 onClick={() => document.getElementById('notes-file')?.click()}
                             >
                                 <span className={styles.uploadIcon}>📎</span>
-                                <Text>Click to select or drag and drop a file</Text>
+                                <Text>Nhấp để chọn hoặc kéo thả tệp</Text>
                                 <Text style={{ fontSize: tokens.fontSizeBase200, opacity: 0.7 }}>
-                                    Supports: .txt, .pdf, .doc, .docx
+                                    Hỗ trợ: .txt, .pdf, .doc, .docx
                                 </Text>
                                 <input
                                     id="notes-file"
@@ -299,7 +299,7 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
                                 />
                                 {notesFile && (
                                     <div className={styles.fileName}>
-                                        Selected: {notesFile.name}
+                                        Đã chọn: {notesFile.name}
                                     </div>
                                 )}
                             </div>
@@ -321,10 +321,10 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
                     </DialogContent>
                     <DialogActions className={styles.dialogActions}>
                         <Button appearance="secondary" onClick={handleCancel} disabled={isSubmitting}>
-                            Cancel
+                            Hủy
                         </Button>
                         <Button appearance="primary" onClick={handleSubmit} disabled={!meetingId || isSubmitting}>
-                            {isSubmitting ? 'Indexing...' : 'Index Meeting'}
+                            {isSubmitting ? 'Đang lập chỉ mục...' : 'Lập chỉ mục cuộc họp'}
                         </Button>
                     </DialogActions>
                 </DialogBody>

@@ -232,7 +232,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
             )}
             <div className={styles.sidebarHeader}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: tokens.spacingVerticalM }}>
-                    <Text className={styles.sidebarTitle}>Conversations</Text>
+                    <Text className={styles.sidebarTitle}>Cuộc trò chuyện</Text>
                     {isMobile && (
                         <Button
                             icon={<PanelLeft24Regular />}
@@ -244,19 +244,19 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                 </div>
 
                 <div className={styles.userIdContainer}>
-                    <Text className={styles.userIdLabel}>User ID:</Text>
+                    <Text className={styles.userIdLabel}>ID người dùng:</Text>
                     <div className={styles.userIdInputWrapper}>
                         <Input
                             className={styles.userIdInput}
                             value={userId}
                             onChange={(_, data) => setUserId(data.value)}
-                            placeholder="Enter your user ID"
+                            placeholder="Nhập ID người dùng của bạn"
                         />
                         <Button
                             className={styles.generateUuidBtn}
                             icon={<CubeMultiple24Regular />}
                             onClick={generateRandomUuid}
-                            title="Generate Random UUID"
+                            title="Tạo UUID ngẫu nhiên"
                         />
                     </div>
                 </div>
@@ -266,7 +266,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                     icon={<Add24Regular />}
                     onClick={createNewConversation}
                 >
-                    New Chat
+                    Trò chuyện mới
                 </Button>
 
                 <Button
@@ -274,18 +274,18 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                     icon={<ClipboardTaskListLtr24Regular />}
                     onClick={openMeetingIndexModal}
                 >
-                    Index Meeting
+                    Lập chỉ mục cuộc họp
                 </Button>
             </div>
 
             <div className={styles.conversationsList}>
                 {isLoading ? (
                     <div style={{ padding: tokens.spacingVerticalL, textAlign: 'center' }}>
-                        <Text>Loading conversations...</Text>
+                        <Text>Đang tải cuộc trò chuyện...</Text>
                     </div>
                 ) : conversations.length === 0 ? (
                     <div style={{ padding: tokens.spacingVerticalL, textAlign: 'center' }}>
-                        <Text>No conversations yet</Text>
+                        <Text>Chưa có cuộc trò chuyện nào</Text>
                     </div>
                 ) : (
                     conversations.map((conversation) => (
@@ -296,7 +296,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                             onClick={() => selectConversation(conversation.id)}
                         >
                             <Text className={styles.conversationTitle}>
-                                {conversation.title || 'Untitled Conversation'}
+                                {conversation.title || 'Cuộc trò chuyện chưa có tiêu đề'}
                             </Text>
                             <div className={styles.conversationMeta}>
                                 <Text>{apiService.formatDate(conversation.updated_at)}</Text>

@@ -143,7 +143,7 @@ export const ChatMain: React.FC<ChatMainProps> = ({
     const [currentMessage, setCurrentMessage] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
-    const [conversationTitle, setConversationTitle] = useState('Select a conversation to start chatting');
+    const [conversationTitle, setConversationTitle] = useState('Chọn một cuộc trò chuyện để bắt đầu chat');
     const [eventSource, setEventSource] = useState<EventSource | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -162,7 +162,7 @@ export const ChatMain: React.FC<ChatMainProps> = ({
             connectToRealTimeUpdates(activeConversationId);
         } else {
             setMessages([]);
-            setConversationTitle('Select a conversation to start chatting');
+            setConversationTitle('Chọn một cuộc trò chuyện để bắt đầu chat');
             disconnectRealTimeUpdates();
         }
 
@@ -185,10 +185,10 @@ export const ChatMain: React.FC<ChatMainProps> = ({
             setMessages(messagesData);
 
             // Update conversation title (you might want to fetch this separately)
-            setConversationTitle('Active Conversation');
+            setConversationTitle('Cuộc trò chuyện đang hoạt động');
         } catch (error) {
             console.error('Error loading conversation messages:', error);
-            setConversationTitle('Error loading conversation');
+            setConversationTitle('Lỗi khi tải cuộc trò chuyện');
         } finally {
             setIsTyping(false);
         }
@@ -297,7 +297,7 @@ export const ChatMain: React.FC<ChatMainProps> = ({
                     <span
                         className={`${styles.connectionStatus} ${isConnected ? styles.connectionStatusConnected : styles.connectionStatusDisconnected
                             }`}
-                        title={isConnected ? 'Connected' : 'Disconnected'}
+                        title={isConnected ? 'Đã kết nối' : 'Mất kết nối'}
                     />
                     <Text>
                         {conversationTitle}
@@ -310,7 +310,7 @@ export const ChatMain: React.FC<ChatMainProps> = ({
                     {messages.map((message) => (
                         <Suspense key={message.id} fallback={
                             <div style={{ padding: tokens.spacingVerticalM, textAlign: 'center' }}>
-                                Loading message...
+                                Đang tải tin nhắn...
                             </div>
                         }>
                             <ChatMessage
@@ -325,7 +325,7 @@ export const ChatMain: React.FC<ChatMainProps> = ({
 
             {isTyping && (
                 <div className={styles.typingIndicator}>
-                    AI is typing...
+                    AI đang nhập...
                 </div>
             )}
 
@@ -337,7 +337,7 @@ export const ChatMain: React.FC<ChatMainProps> = ({
                         value={currentMessage}
                         onChange={handleInputChange}
                         onKeyPress={handleKeyPress}
-                        placeholder="Type your message here... (Press Enter to send, Shift+Enter for new line)"
+                        placeholder="Nhập tin nhắn của bạn ở đây... (Nhấn Enter để gửi, Shift+Enter để xuống dòng)"
                         rows={1}
                     />
                     <Button
@@ -346,7 +346,7 @@ export const ChatMain: React.FC<ChatMainProps> = ({
                         onClick={handleSendMessage}
                         disabled={!currentMessage.trim()}
                     >
-                        Send
+                        Gửi
                     </Button>
                 </div>
             </div>

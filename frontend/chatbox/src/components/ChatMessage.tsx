@@ -171,7 +171,7 @@ export function ChatMessage({
       {/* Bot Avatar and Timestamp */}
       <div className={styles.assistantHeader}>
         <span className={styles.assistantLabel}>
-          Assistant
+          Trợ lý
         </span>
         <span className={styles.assistantTimestamp}>
           {new Date(message.created_at).toLocaleTimeString()}
@@ -226,7 +226,7 @@ export function ChatMessage({
               blockquote: (props: any) => (
                 <blockquote className="border-l-4 border-blue-500 bg-blue-50 p-4 my-4 rounded-r-lg dark:bg-blue-950 dark:border-blue-400">
                   <div className="text-blue-800 text-sm mb-2 font-medium dark:text-blue-200">
-                    System Prompt
+                    Lời nhắc hệ thống
                   </div>
                   <div className="text-gray-900 italic dark:text-gray-100">
                     {props.children}
