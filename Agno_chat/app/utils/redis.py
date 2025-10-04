@@ -18,7 +18,7 @@ def _get_redis_auth_kwargs():
 redis_pool = ConnectionPool(
     host=settings.REDIS_HOST,
     port=int(settings.REDIS_PORT),
-    db=int(settings.REDIS_DB),
+    db=int(settings.REDIS_DB_CHAT),
     decode_responses=True,
     retry_on_timeout=True,
     socket_timeout=10,
@@ -33,7 +33,7 @@ redis_client = redis.Redis(
     host=settings.REDIS_HOST,
     port=int(settings.REDIS_PORT),
     decode_responses=True,
-    db=int(settings.REDIS_DB),
+    db=int(settings.REDIS_DB_CHAT),
     **_get_redis_auth_kwargs()
 )
 
@@ -42,7 +42,7 @@ try:
     redis_async_client = aioredis.Redis(
         host=settings.REDIS_HOST,
         port=int(settings.REDIS_PORT),
-        db=int(settings.REDIS_DB),
+        db=int(settings.REDIS_DB_CHAT),
         decode_responses=True,
         retry_on_timeout=True,
         socket_timeout=10,

@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     # Redis Configuration
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
-    REDIS_DB: int = 0
+    REDIS_DB_S2T: int = 0
     REDIS_PASSWORD: str = ""
     REDIS_USER: str = ""
 
@@ -49,11 +49,11 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def CELERY_BROKER_URL(self) -> str:
-        return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+        return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB_S2T}"
 
     @computed_field
     @property
     def CELERY_RESULT_BACKEND(self) -> str:
-        return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+        return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB_S2T}"
 
 settings = Settings()

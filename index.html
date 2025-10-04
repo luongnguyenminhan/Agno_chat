@@ -1,18 +1,7 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8">
-  <title>Hộp trò chuyện nổi</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-    }
-    /* bubble tròn */
-    .chat-bubble {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
+<!DOCTYPE h    .chat-bubble {
+      position: absolute;
+      left: calc(100vw - 80px);
+      top: calc(100vh - 80px);
       width: 60px;
       height: 60px;
       border-radius: 50%;
@@ -24,12 +13,38 @@
       cursor: pointer;
       box-shadow: 0 4px 6px rgba(0,0,0,0.2);
       z-index: 1000;
+      transition: left 0.1s ease, top 0.1s ease;
+      will-change: left, top;
+    }"vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Hộp trò chuyện nổi</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    /* bubble tròn */
+    .chat-bubble {
+      position: absolute;
+      left: calc(100vw - 80px);
+      top: calc(100vh - 80px);
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background-color: #3c3ec0;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+      z-index: 1000;
+      transition: left 0.1s ease, top 0.1s ease;
     }
     /* chatbox popup */
     .chat-popup {
-      position: fixed;
-      bottom: 90px;
-      right: 20px;
+      position: absolute;
       width: 500px;
       height: 800px;
       border: 1px solid #ccc;
@@ -51,18 +66,93 @@
   <div class="chat-bubble" id="chatToggle">💬</div>
 
   <div class="chat-popup" id="chatBox">
-    <iframe src="http://localhost:9999"></iframe>
+    <iframe src="https://chat.wc504.io.vn/"></iframe>
   </div>
 
   <script>
     const chatToggle = document.getElementById("chatToggle");
     const chatBox = document.getElementById("chatBox");
 
-    chatToggle.addEventListener("click", () => {
-      if (chatBox.style.display === "none" || chatBox.style.display === "") {
-        chatBox.style.display = "block";
+    let isDragging = false;
+    let dragOffsetX, dragOffsetY;
+
+    function snapToNearestEdge() {
+      const centerX = chatToggle.offsetLeft + 30;
+      const centerY = chatToggle.offsetTop + 30;
+      const distTop = centerY;
+      const distBottom = window.innerHeight - centerY;
+      const distLeft = centerX;
+      const distRight = window.innerWidth - centerX;
+      const minDist = Math.min(distTop, distBottom, distLeft, distRight);
+      if (minDist === distTop) {
+        chatToggle.style.top = "20px";
+      } else if (minDist === distBottom) {
+        chatToggle.style.top = (window.innerHeight - 80) + "px";
+      } else if (minDist === distLeft) {
+        chatToggle.style.left = "20px";
       } else {
+        chatToggle.style.left = (window.innerWidth - 80) + "px";
+      }
+    }
+
+    function positionPopup() {
+      const toggleRect = chatToggle.getBoundingClientRect();
+      const boxWidth = 500;
+      const boxHeight = 800;
+      const spacing = 20;
+
+      let left = toggleRect.left - boxWidth - spacing;
+      let top = toggleRect.top - boxHeight + toggleRect.height;
+
+      if (left < 0) {
+        left = toggleRect.right + spacing;
+      }
+      if (top < 0) {
+        top = toggleRect.bottom + spacing;
+      }
+      if (left + boxWidth > window.innerWidth) {
+        left = window.innerWidth - boxWidth - spacing;
+      }
+      if (top + boxHeight > window.innerHeight) {
+        top = window.innerHeight - boxHeight - spacing;
+      }
+
+      chatBox.style.left = left + "px";
+      chatBox.style.top = top + "px";
+    }
+
+    chatToggle.addEventListener("click", (e) => {
+      if (!isDragging) {
+        if (chatBox.style.display === "none" || chatBox.style.display === "") {
+          positionPopup();
+          chatBox.style.display = "block";
+        } else {
+          chatBox.style.display = "none";
+        }
+      }
+    });
+
+    chatToggle.addEventListener("mousedown", (e) => {
+      isDragging = true;
+      dragOffsetX = e.clientX - chatToggle.offsetLeft;
+      dragOffsetY = e.clientY - chatToggle.offsetTop;
+      e.preventDefault();
+      if (chatBox.style.display === "block") {
         chatBox.style.display = "none";
+      }
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      if (isDragging) {
+        chatToggle.style.left = (e.clientX - dragOffsetX) + "px";
+        chatToggle.style.top = (e.clientY - dragOffsetY) + "px";
+      }
+    });
+
+    document.addEventListener("mouseup", () => {
+      if (isDragging) {
+        snapToNearestEdge();
+        isDragging = false;
       }
     });
   </script>

@@ -183,7 +183,7 @@ def health_redis() -> Dict[str, Any]:
             "status": "connected",
             "host": settings.REDIS_HOST,
             "port": settings.REDIS_PORT,
-            "db": settings.REDIS_DB,
+            "db": settings.REDIS_DB_S2T,
             "version": info.get("redis_version", "unknown"),
             "uptime_seconds": info.get("uptime_in_seconds", 0),
             "connected_clients": info.get("connected_clients", 0),
