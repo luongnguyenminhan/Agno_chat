@@ -59,7 +59,7 @@ def custom_openapi():
     # Add custom servers for different environments
     openapi_schema["servers"] = [
         {"url": "http://localhost:9998", "description": "Development server"},
-        {"url": "https://api.securescribe.com", "description": "Production server"},
+        {"url": "https://s2t.wc504.io.vn", "description": "Production server"},
     ]
 
     # Add security schemes
