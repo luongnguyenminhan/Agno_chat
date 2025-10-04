@@ -12,6 +12,7 @@
   "dependencies": {
     "@fluentui/react-components": "^9.72.0",
     "@fluentui/react-icons": "^2.0.311",
+    "js-cookie": "^3.0.5",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

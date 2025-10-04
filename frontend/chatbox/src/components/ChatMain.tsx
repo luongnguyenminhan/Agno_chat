@@ -1,12 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
 import {
-    makeStyles,
-    tokens,
     Button,
-    Textarea,
+    makeStyles,
     Text,
+    Textarea,
+    tokens,
 } from '@fluentui/react-components';
-import { Send24Regular } from '@fluentui/react-icons';
+import { PanelRight24Regular, Send24Regular } from '@fluentui/react-icons';
+import React, { useEffect, useRef, useState } from 'react';
+import { apiService } from '../services/api';
+import type { Message } from '../services/api';
 
 const useStyles = makeStyles({
     chatMain: {
@@ -15,14 +17,25 @@ const useStyles = makeStyles({
         flexDirection: 'column',
         backgroundColor: tokens.colorNeutralBackground1,
         overflow: 'hidden',
+        width: '100%',
+    },
+    chatMainFullWidth: {
+        width: '100%',
     },
     chatHeader: {
-        padding: `${tokens.spacingVerticalL} ${tokens.spacingVerticalXL}`,
+        padding: `${tokens.spacingVerticalL} ${tokens.spacingVerticalL}`,
         borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
         backgroundColor: tokens.colorNeutralBackground2,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: tokens.spacingHorizontalS,
+    },
+    mobileToggleButton: {
+        display: 'none',
+        '@media (max-width: 767px)': {
+            display: 'flex',
+        },
     },
     conversationTitleDisplay: {
         fontSize: tokens.fontSizeBase400,
@@ -106,19 +119,33 @@ const useStyles = makeStyles({
     },
 });
 
-interface Message {
-    id: string;
-    content: string;
-    sender: 'user' | 'assistant';
-    timestamp: Date;
+interface ChatMainProps {
+    sidebarOpen: boolean;
+    isMobile: boolean;
+    onToggleSidebar: () => void;
+    activeConversationId?: string | null;
+    onConversationChange?: (conversationId: string) => void;
 }
 
-export const ChatMain: React.FC = () => {
+export const ChatMain: React.FC<ChatMainProps> = ({
+    sidebarOpen,
+    isMobile,
+    onToggleSidebar,
+    activeConversationId,
+}) => {
     const styles = useStyles();
+
+    const chatMainClasses = [
+        styles.chatMain,
+        !sidebarOpen && !isMobile && styles.chatMainFullWidth,
+    ].filter(Boolean).join(' ');
+
     const [messages, setMessages] = useState<Message[]>([]);
     const [currentMessage, setCurrentMessage] = useState('');
     const [isTyping, setIsTyping] = useState(false);
-    const [isConnected] = useState(false);
+    const [isConnected, setIsConnected] = useState(false);
+    const [conversationTitle, setConversationTitle] = useState('Select a conversation to start chatting');
+    const [eventSource, setEventSource] = useState<EventSource | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -130,36 +157,97 @@ export const ChatMain: React.FC = () => {
         scrollToBottom();
     }, [messages]);
 
-    const handleSendMessage = () => {
-        if (!currentMessage.trim()) return;
+    useEffect(() => {
+        if (activeConversationId) {
+            loadConversationMessages(activeConversationId);
+            connectToRealTimeUpdates(activeConversationId);
+        } else {
+            setMessages([]);
+            setConversationTitle('Select a conversation to start chatting');
+            disconnectRealTimeUpdates();
+        }
 
-        const newMessage: Message = {
-            id: Date.now().toString(),
-            content: currentMessage,
-            sender: 'user',
-            timestamp: new Date(),
+        return () => {
+            disconnectRealTimeUpdates();
         };
+    }, [activeConversationId]);
 
-        setMessages(prev => [...prev, newMessage]);
+    useEffect(() => {
+        // Cleanup on unmount
+        return () => {
+            disconnectRealTimeUpdates();
+        };
+    }, []);
+
+    const loadConversationMessages = async (conversationId: string) => {
+        try {
+            setIsTyping(true);
+            const messagesData = await apiService.getConversationMessages(conversationId);
+            setMessages(messagesData);
+
+            // Update conversation title (you might want to fetch this separately)
+            setConversationTitle('Active Conversation');
+        } catch (error) {
+            console.error('Error loading conversation messages:', error);
+            setConversationTitle('Error loading conversation');
+        } finally {
+            setIsTyping(false);
+        }
+    };
+
+    const connectToRealTimeUpdates = (conversationId: string) => {
+        disconnectRealTimeUpdates();
+
+        try {
+            const newEventSource = apiService.connectToConversation(conversationId, (message: Message) => {
+                setMessages(prev => [...prev, message]);
+                setIsTyping(false); // Hide typing indicator when message arrives
+            });
+
+            setEventSource(newEventSource);
+            setIsConnected(true);
+        } catch (error) {
+            console.error('Error connecting to real-time updates:', error);
+            setIsConnected(false);
+        }
+    };
+
+    const disconnectRealTimeUpdates = () => {
+        if (eventSource) {
+            apiService.disconnectSSE(eventSource);
+            setEventSource(null);
+            setIsConnected(false);
+        }
+    };
+
+    const handleSendMessage = async () => {
+        if (!currentMessage.trim() || !activeConversationId) return;
+
+        const content = currentMessage.trim();
         setCurrentMessage('');
-        setIsTyping(true);
 
         // Auto-resize textarea back to single line
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
         }
 
-        // Simulate assistant response
-        setTimeout(() => {
-            const assistantMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                content: 'This is a simulated response from the assistant.',
-                sender: 'assistant',
-                timestamp: new Date(),
-            };
-            setMessages(prev => [...prev, assistantMessage]);
+        // Parse mentions from content
+        const mentions = apiService.parseMentions(content);
+
+        try {
+            setIsTyping(true);
+            await apiService.sendMessage(activeConversationId, {
+                content,
+                mentions,
+            });
+
+            // The real-time update will handle adding the message to the UI
+        } catch (error) {
+            console.error('Error sending message:', error);
             setIsTyping(false);
-        }, 1000);
+            // Restore the message content if sending failed
+            setCurrentMessage(content);
+        }
     };
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -180,16 +268,25 @@ export const ChatMain: React.FC = () => {
     };
 
     return (
-        <div className={styles.chatMain}>
+        <div className={chatMainClasses}>
             <div className={styles.chatHeader}>
                 <div className={styles.conversationTitleDisplay}>
+                    {isMobile && (
+                        <Button
+                            className={styles.mobileToggleButton}
+                            icon={<PanelRight24Regular />}
+                            onClick={onToggleSidebar}
+                            size="small"
+                            appearance="subtle"
+                        />
+                    )}
                     <span
                         className={`${styles.connectionStatus} ${isConnected ? styles.connectionStatusConnected : styles.connectionStatusDisconnected
                             }`}
                         title={isConnected ? 'Connected' : 'Disconnected'}
                     />
                     <Text>
-                        {messages.length > 0 ? 'Active Conversation' : 'Select a conversation to start chatting'}
+                        {conversationTitle}
                     </Text>
                 </div>
             </div>
@@ -199,13 +296,13 @@ export const ChatMain: React.FC = () => {
                     {messages.map((message) => (
                         <div key={message.id} className={styles.messageItem}>
                             <div
-                                className={`${styles.messageContent} ${message.sender === 'user' ? styles.messageUser : styles.messageAssistant
+                                className={`${styles.messageContent} ${message.message_type === 'user' ? styles.messageUser : styles.messageAssistant
                                     }`}
                             >
                                 <Text>{message.content}</Text>
                             </div>
                             <Text className={styles.messageTimestamp}>
-                                {message.timestamp.toLocaleTimeString()}
+                                {new Date(message.created_at).toLocaleTimeString()}
                             </Text>
                         </div>
                     ))}

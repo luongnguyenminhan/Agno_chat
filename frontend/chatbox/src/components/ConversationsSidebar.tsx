@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     makeStyles,
     tokens,
@@ -6,17 +6,43 @@ import {
     Input,
     Text,
 } from '@fluentui/react-components';
-import { Add24Regular, CubeMultiple24Regular, ClipboardTaskListLtr24Regular } from '@fluentui/react-icons';
+import { Add24Regular, CubeMultiple24Regular, ClipboardTaskListLtr24Regular, PanelLeft24Regular } from '@fluentui/react-icons';
 import { MeetingModal } from './MeetingModal';
+import { apiService, type Conversation } from '../services/api';
+import { useUser } from '../hooks/useUser';
+import type { UserContextType } from '../contexts/userContext.types';
+import { UserIdManager } from '../utils/cookie';
 
 const useStyles = makeStyles({
     sidebar: {
         width: '320px',
+        minWidth: '280px',
         backgroundColor: tokens.colorNeutralBackground1,
         borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        transition: `all ${tokens.durationNormal}`,
+        position: 'relative',
+    },
+    sidebarCollapsed: {
+        width: '0px',
+        minWidth: '0px',
+        opacity: 0,
+        transform: 'translateX(-100%)',
+        pointerEvents: 'none',
+    },
+    sidebarMobile: {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        height: '100%',
+        zIndex: 1000,
+        boxShadow: tokens.shadow64,
+        transform: 'translateX(-100%)',
+    },
+    sidebarMobileOpen: {
+        transform: 'translateX(0%)',
     },
     sidebarHeader: {
         padding: tokens.spacingVerticalL,
@@ -106,43 +132,71 @@ const useStyles = makeStyles({
     },
 });
 
-interface Conversation {
-    id: string;
-    title: string;
-    lastMessage?: string;
-    messageCount: number;
-    timestamp: Date;
+// Using Conversation interface from api.ts
+
+interface ConversationsSidebarProps {
+    isOpen: boolean;
+    isMobile: boolean;
+    onToggle: () => void;
+    activeConversationId?: string | null;
+    onConversationSelect?: (conversationId: string) => void;
 }
 
-export const ConversationsSidebar: React.FC = () => {
+export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
+    isOpen,
+    isMobile,
+    onToggle,
+    activeConversationId,
+    onConversationSelect
+}) => {
     const styles = useStyles();
-    const [userId, setUserId] = useState('4c3b4f0f-8d99-42cd-9676-8a16a974c507');
+    const { userId, setUserId }: UserContextType = useUser();
     const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
     const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
-    const generateRandomUuid = () => {
-        const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-        setUserId(uuid);
+    useEffect(() => {
+        loadConversations();
+    }, [userId]);
+
+    const loadConversations = async () => {
+        setIsLoading(true);
+        try {
+            const conversationsData = await apiService.getConversations();
+            setConversations(conversationsData);
+        } catch (error) {
+            console.error('Error loading conversations:', error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const createNewConversation = () => {
-        const newConversation: Conversation = {
-            id: Date.now().toString(),
-            title: 'New Conversation',
-            messageCount: 0,
-            timestamp: new Date(),
-        };
-        setConversations(prev => [newConversation, ...prev]);
-        setActiveConversationId(newConversation.id);
+    const generateRandomUuid = () => {
+        const newUuid = UserIdManager.generateNewUserId();
+        // Save to cookie and update context immediately
+        UserIdManager.setUserId(newUuid);
+        setUserId(newUuid);
+    };
+
+    const createNewConversation = async () => {
+        setIsLoading(true);
+        try {
+            const newConversation = await apiService.createConversation('New Conversation');
+            setConversations(prev => [newConversation, ...prev]);
+            if (onConversationSelect) {
+                onConversationSelect(newConversation.id);
+            }
+        } catch (error) {
+            console.error('Error creating conversation:', error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const selectConversation = (conversationId: string) => {
-        setActiveConversationId(conversationId);
+        if (onConversationSelect) {
+            onConversationSelect(conversationId);
+        }
     };
 
     const openMeetingIndexModal = () => {
@@ -153,10 +207,41 @@ export const ConversationsSidebar: React.FC = () => {
         setIsMeetingModalOpen(false);
     };
 
+    const sidebarClasses = [
+        styles.sidebar,
+        !isOpen && styles.sidebarCollapsed,
+        isMobile && styles.sidebarMobile,
+        isMobile && isOpen && styles.sidebarMobileOpen,
+    ].filter(Boolean).join(' ');
+
     return (
-        <div className={styles.sidebar}>
+        <div className={sidebarClasses}>
+            {isMobile && isOpen && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: '320px',
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        zIndex: 999,
+                    }}
+                    onClick={onToggle}
+                />
+            )}
             <div className={styles.sidebarHeader}>
-                <Text className={styles.sidebarTitle}>Conversations</Text>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: tokens.spacingVerticalM }}>
+                    <Text className={styles.sidebarTitle}>Conversations</Text>
+                    {isMobile && (
+                        <Button
+                            icon={<PanelLeft24Regular />}
+                            onClick={onToggle}
+                            size="small"
+                            appearance="subtle"
+                        />
+                    )}
+                </div>
 
                 <div className={styles.userIdContainer}>
                     <Text className={styles.userIdLabel}>User ID:</Text>
@@ -194,22 +279,34 @@ export const ConversationsSidebar: React.FC = () => {
             </div>
 
             <div className={styles.conversationsList}>
-                {conversations.map((conversation) => (
-                    <div
-                        key={conversation.id}
-                        className={`${styles.conversationItem} ${activeConversationId === conversation.id ? styles.conversationItemActive : ''
-                            }`}
-                        onClick={() => selectConversation(conversation.id)}
-                    >
-                        <Text className={styles.conversationTitle}>{conversation.title}</Text>
-                        <div className={styles.conversationMeta}>
-                            <Text>{conversation.timestamp.toLocaleDateString()}</Text>
-                            {conversation.messageCount > 0 && (
-                                <span className={styles.messageCount}>{conversation.messageCount}</span>
-                            )}
-                        </div>
+                {isLoading ? (
+                    <div style={{ padding: tokens.spacingVerticalL, textAlign: 'center' }}>
+                        <Text>Loading conversations...</Text>
                     </div>
-                ))}
+                ) : conversations.length === 0 ? (
+                    <div style={{ padding: tokens.spacingVerticalL, textAlign: 'center' }}>
+                        <Text>No conversations yet</Text>
+                    </div>
+                ) : (
+                    conversations.map((conversation) => (
+                        <div
+                            key={conversation.id}
+                            className={`${styles.conversationItem} ${activeConversationId === conversation.id ? styles.conversationItemActive : ''
+                                }`}
+                            onClick={() => selectConversation(conversation.id)}
+                        >
+                            <Text className={styles.conversationTitle}>
+                                {conversation.title || 'Untitled Conversation'}
+                            </Text>
+                            <div className={styles.conversationMeta}>
+                                <Text>{apiService.formatDate(conversation.updated_at)}</Text>
+                                {conversation.message_count && conversation.message_count > 0 && (
+                                    <span className={styles.messageCount}>{conversation.message_count}</span>
+                                )}
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
 
             <MeetingModal isOpen={isMeetingModalOpen} onClose={closeMeetingModal} />

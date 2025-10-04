@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from 'react';
 import {
     makeStyles,
@@ -14,13 +15,24 @@ import {
     Textarea,
 } from '@fluentui/react-components';
 import { CubeMultiple24Regular } from '@fluentui/react-icons';
+import { apiService } from '../services/api';
+import { useUser } from '../hooks/useUser';
+import type { UserContextType } from '../contexts/userContext.types';
 
 const useStyles = makeStyles({
     modal: {
         maxWidth: '600px',
         width: '90vw',
+        minWidth: '320px',
         maxHeight: '90vh',
         overflowY: 'auto',
+    },
+    modalMobile: {
+        width: '100vw',
+        height: '100vh',
+        maxWidth: 'none',
+        maxHeight: 'none',
+        borderRadius: '0',
     },
     formGroup: {
         marginBottom: tokens.spacingVerticalL,
@@ -101,18 +113,27 @@ interface MeetingModalProps {
 
 export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) => {
     const styles = useStyles();
+    const { userId }: UserContextType = useUser();
     const [meetingId, setMeetingId] = useState('');
     const [transcript, setTranscript] = useState('');
     const [notesFile, setNotesFile] = useState<File | null>(null);
     const [isDragOver, setIsDragOver] = useState(false);
     const [indexStatus, setIndexStatus] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
+
+    React.useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 768);
+        };
+
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     const generateMeetingUuid = () => {
-        const uuid = 'meeting-xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
+        const uuid = apiService.generateUUID();
         setMeetingId(uuid);
     };
 
@@ -133,19 +154,47 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
         }
     };
 
-    const handleSubmit = () => {
-        // TODO: Implement meeting indexing logic
+    const handleSubmit = async () => {
+        if (!meetingId.trim()) {
+            setIndexStatus('Please enter a meeting ID');
+            return;
+        }
+
+        if (!transcript.trim() && !notesFile) {
+            setIndexStatus('Please provide either transcript or meeting notes file');
+            return;
+        }
+
+        setIsSubmitting(true);
         setIndexStatus('Indexing meeting content...');
-        setTimeout(() => {
-            setIndexStatus('Meeting indexed successfully!');
-            setTimeout(() => {
-                onClose();
-                setMeetingId('');
-                setTranscript('');
-                setNotesFile(null);
-                setIndexStatus('');
-            }, 2000);
-        }, 2000);
+
+        try {
+            const response = await apiService.indexMeeting({
+                meeting_id: meetingId.trim(),
+                transcript: transcript.trim() || undefined,
+                meeting_note_file: notesFile || undefined,
+                current_user_id: userId,
+            });
+
+            if (response.success) {
+                setIndexStatus(`Successfully indexed meeting: ${response.data?.processed_items?.join(', ')}`);
+                setTimeout(() => {
+                    onClose();
+                    // Reset form
+                    setMeetingId('');
+                    setTranscript('');
+                    setNotesFile(null);
+                    setIndexStatus('');
+                }, 2000);
+            } else {
+                throw new Error(response.message || 'Failed to index meeting');
+            }
+        } catch (error: any) {
+            console.error('Error indexing meeting:', error);
+            setIndexStatus(`Error: ${error.message}`);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleCancel = () => {
@@ -156,9 +205,14 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
         onClose();
     };
 
+    const modalClasses = [
+        styles.modal,
+        isMobile && styles.modalMobile,
+    ].filter(Boolean).join(' ');
+
     return (
         <Dialog open={isOpen} onOpenChange={(_, data) => !data.open && onClose()}>
-            <DialogSurface className={styles.modal}>
+            <DialogSurface className={modalClasses}>
                 <DialogBody>
                     <DialogTitle>Index Meeting Content</DialogTitle>
                     <DialogContent>
@@ -239,8 +293,8 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
                         <Button appearance="secondary" onClick={handleCancel}>
                             Cancel
                         </Button>
-                        <Button appearance="primary" onClick={handleSubmit} disabled={!meetingId}>
-                            Index Meeting
+                        <Button appearance="primary" onClick={handleSubmit} disabled={!meetingId || isSubmitting}>
+                            {isSubmitting ? 'Indexing...' : 'Index Meeting'}
                         </Button>
                     </DialogActions>
                 </DialogBody>

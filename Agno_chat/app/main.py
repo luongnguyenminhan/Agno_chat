@@ -129,13 +129,13 @@ app.add_middleware(
 app.include_router(api_router)
 
 # Mount static files AFTER API router to avoid conflicts
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/", StaticFiles(directory="app/static", html=True), name="static")
 
 # Serve chat application files directly for easier access
 @app.get("/chat/css", response_class=FileResponse)
 def serve_chat_css():
     """Serve chat_bubble.css file directly"""
-    file_path = os.path.join("app", "static", "chat_bubble.css")
+    file_path = os.path.join("app", "static", "assets", "chat_bubble.css")
     if os.path.exists(file_path):
         return FileResponse(file_path, media_type="text/css")
     else:
@@ -144,7 +144,7 @@ def serve_chat_css():
 @app.get("/chat/js", response_class=FileResponse)
 def serve_chat_js():
     """Serve chat_bubble.js file directly"""
-    file_path = os.path.join("app", "static", "chat_bubble.js")
+    file_path = os.path.join("app", "static", "assets", "chat_bubble.js")
     if os.path.exists(file_path):
         return FileResponse(file_path, media_type="application/javascript")
     else:
@@ -154,11 +154,11 @@ def serve_chat_js():
 @app.get("/chat")
 def serve_chat_app():
     """Serve the complete chat application"""
-    file_path = os.path.join("app", "static", "chat_bubble.html")
+    file_path = os.path.join("app", "static", "index.html")
     if os.path.exists(file_path):
         return FileResponse(file_path, media_type="text/html")
     else:
-        raise HTTPException(status_code=404, detail="chat_bubble.html not found")
+        raise HTTPException(status_code=404, detail="index.html not found")
 
 
 @app.get("/health")
