@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   // Define API base URL from environment or default
-  const apiBaseUrl = env.VITE_API_BASE_URL || 'http://localhost:9999'
+  const apiBaseUrl = env.VITE_API_BASE_URL || 'https://chat.wc504.io.vn'
 
   // Log current mode and API URL for debugging
   console.log(`[Vite Config] Mode: ${mode}`)

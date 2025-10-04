@@ -1,9 +1,6 @@
-import { Button } from '@fluentui/react-components';
-import { ArrowDownload24Regular, Checkmark24Regular, Copy24Regular } from '@fluentui/react-icons';
-import { useState } from 'react';
+import { makeStyles, tokens } from '@fluentui/react-components';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { makeStyles, tokens } from '@fluentui/react-components';
 
 const useStyles = makeStyles({
     headerContainer: {
@@ -111,77 +108,7 @@ export function MessageCodeBlock({
     language,
     variant = 'header'
 }: MessageCodeBlockProps) {
-    const [copied, setCopied] = useState(false);
     const styles = useStyles();
-
-    // Map common language names to file extensions
-    const getFileExtension = (lang: string): string => {
-        const extensionMap: Record<string, string> = {
-            javascript: 'js',
-            typescript: 'ts',
-            python: 'py',
-            java: 'java',
-            cpp: 'cpp',
-            'c++': 'cpp',
-            c: 'c',
-            csharp: 'cs',
-            'c#': 'cs',
-            php: 'php',
-            ruby: 'rb',
-            go: 'go',
-            rust: 'rs',
-            swift: 'swift',
-            kotlin: 'kt',
-            scala: 'scala',
-            html: 'html',
-            css: 'css',
-            scss: 'scss',
-            sass: 'sass',
-            less: 'less',
-            json: 'json',
-            xml: 'xml',
-            yaml: 'yml',
-            yml: 'yml',
-            markdown: 'md',
-            sql: 'sql',
-            bash: 'sh',
-            shell: 'sh',
-            powershell: 'ps1',
-            dockerfile: 'dockerfile',
-            tsx: 'tsx',
-            jsx: 'jsx'
-        };
-        return extensionMap[lang.toLowerCase()] || 'txt';
-    };
-
-    const handleCopy = async () => {
-        try {
-            await navigator.clipboard.writeText(code);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        } catch (err) {
-            console.error('Failed to copy code block:', err);
-        }
-    };
-
-    const handleDownload = () => {
-        try {
-            const extension = getFileExtension(language);
-            const fileName = `code.${extension}`;
-            const blob = new Blob([code], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        } catch (err) {
-            console.error('Failed to download code:', err);
-        }
-    };
 
     if (variant === 'header') {
         return (
@@ -190,35 +117,6 @@ export function MessageCodeBlock({
                     {/* Header with language and actions */}
                     <div className={styles.header}>
                         <span className={styles.languageLabel}>{language}</span>
-                        <div className={styles.headerActions}>
-                            <Button
-                                appearance="subtle"
-                                size="small"
-                                onClick={handleDownload}
-                                className={styles.actionButton}
-                            >
-                                <ArrowDownload24Regular style={{ width: '12px', height: '12px' }} />
-                                Download
-                            </Button>
-                            <Button
-                                appearance="subtle"
-                                size="small"
-                                onClick={handleCopy}
-                                className={styles.actionButton}
-                            >
-                                {copied ? (
-                                    <>
-                                        <Checkmark24Regular style={{ width: '12px', height: '12px' }} />
-                                        Copied
-                                    </>
-                                ) : (
-                                    <>
-                                        <Copy24Regular style={{ width: '12px', height: '12px' }} />
-                                        Copy
-                                    </>
-                                )}
-                            </Button>
-                        </div>
                     </div>
 
                     {/* Code content with syntax highlighting */}
@@ -264,35 +162,6 @@ export function MessageCodeBlock({
                         {code}
                     </SyntaxHighlighter>
 
-                    {/* Floating action buttons */}
-                    <div className={styles.floatingActions}>
-                        <Button
-                            appearance="subtle"
-                            size="small"
-                            onClick={handleDownload}
-                            className={styles.actionButtonFloating}
-                        >
-                            <ArrowDownload24Regular style={{ width: '12px', height: '12px' }} />
-                        </Button>
-                        <Button
-                            appearance="subtle"
-                            size="small"
-                            onClick={handleCopy}
-                            className={styles.actionButtonFloating}
-                        >
-                            {copied ? (
-                                <>
-                                    <Checkmark24Regular style={{ width: '12px', height: '12px' }} />
-                                    Copied
-                                </>
-                            ) : (
-                                <>
-                                    <Copy24Regular style={{ width: '12px', height: '12px' }} />
-                                    Copy
-                                </>
-                            )}
-                        </Button>
-                    </div>
                 </div>
             </div>
         );
@@ -317,30 +186,6 @@ export function MessageCodeBlock({
                 >
                     {code}
                 </SyntaxHighlighter>
-
-                {/* Action buttons for inline variant */}
-                <div className={styles.inlineActions}>
-                    <Button
-                        appearance="subtle"
-                        size="small"
-                        onClick={handleDownload}
-                        className={styles.actionButton}
-                    >
-                        <ArrowDownload24Regular style={{ width: '12px', height: '12px' }} />
-                    </Button>
-                    <Button
-                        appearance="subtle"
-                        size="small"
-                        onClick={handleCopy}
-                        className={styles.actionButton}
-                    >
-                        {copied ? (
-                            <Checkmark24Regular style={{ width: '12px', height: '12px' }} />
-                        ) : (
-                            <Copy24Regular style={{ width: '12px', height: '12px' }} />
-                        )}
-                    </Button>
-                </div>
             </div>
         </>
     );
