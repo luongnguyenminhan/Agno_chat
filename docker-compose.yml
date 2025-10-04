@@ -1,32 +1,88 @@
 version: '3.8'
 
 services:
-  api:
-    build: .
-    image: securescribe-api
+  # Chat API Service (Agno_chat)
+  chat_api:
+    build: ./Agno_chat
+    image: securescribe-chat-api
     ports:
       - "9999:8000"
     env_file:
       - .env
     volumes:
-      - .:/app
+      - ./Agno_chat:/app
       - /app/__pycache__
     restart: unless-stopped
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app
     networks:
       - securescribe-net
+    depends_on:
+      - redis
 
-  celery_worker:
-    image: securescribe-api
+  # Chat Celery Worker
+  chat_worker:
+    image: securescribe-chat-api
     command: celery -A app.jobs.celery_worker worker --loglevel=info --concurrency=2
     env_file:
       - .env
     volumes:
-      - .:/app
+      - ./Agno_chat:/app
     restart: unless-stopped
     networks:
       - securescribe-net
+    depends_on:
+      - redis
+
+  # Speech-to-Text API Service
+  s2t_api:
+    build: ./Speech_to_text
+    image: securescribe-s2t-api
+    ports:
+      - "9998:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./Speech_to_text:/app
+      - /app/__pycache__
+      - shared_temp:/tmp
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app
+    networks:
+      - securescribe-net
+    depends_on:
+      - redis
+
+  # Speech-to-Text Celery Worker
+  s2t_worker:
+    image: securescribe-s2t-api
+    command: celery -A app.jobs.celery_worker worker --loglevel=info --concurrency=2
+    env_file:
+      - .env
+    volumes:
+      - ./Speech_to_text:/app
+      - shared_temp:/tmp
+    restart: unless-stopped
+    networks:
+      - securescribe-net
+    depends_on:
+      - redis
+
+  # Redis Service (shared between both applications)
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - securescribe-net
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
 
 networks:
   securescribe-net:
     driver: bridge
+
+volumes:
+  shared_temp:
+  redis_data:
