@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { makeStyles, tokens } from '@fluentui/react-components';
 import { ConversationsSidebar } from './ConversationsSidebar';
 import { ChatMain } from './ChatMain';
+import type { Conversation } from '../services/api';
 
 const useStyles = makeStyles({
     chatContainer: {
@@ -9,7 +10,6 @@ const useStyles = makeStyles({
         height: '100vh',
         width: '100%',
         backgroundColor: tokens.colorNeutralBackground1,
-        boxShadow: tokens.shadow16,
         position: 'relative',
     },
     chatContainerEmbedded: {
@@ -30,14 +30,12 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
+    // Handle responsive design
     useEffect(() => {
         const checkMobile = () => {
-            setIsMobile(window.innerWidth < 768);
-            if (window.innerWidth < 768) {
-                setSidebarOpen(false);
-            } else {
-                setSidebarOpen(true);
-            }
+            const mobile = window.innerWidth < 768;
+            setIsMobile(mobile);
+            setSidebarOpen(!mobile);
         };
 
         checkMobile();
@@ -45,13 +43,30 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    const toggleSidebar = () => {
-        setSidebarOpen(!sidebarOpen);
-    };
+    // Auto-select most recent conversation
+    const handleConversationsLoad = useCallback((conversations: Conversation[]) => {
+        if (conversations.length > 0 && !activeConversationId) {
+            const recent = conversations.sort((a, b) =>
+                new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+            )[0];
+            setActiveConversationId(recent.id);
+        }
+    }, [activeConversationId]);
 
-    const handleConversationSelect = (conversationId: string) => {
+    // Handle new conversation creation
+    const handleNewConversation = useCallback((conversation: Conversation) => {
+        setActiveConversationId(conversation.id);
+    }, []);
+
+    // Handle conversation selection
+    const handleConversationSelect = useCallback((conversationId: string) => {
         setActiveConversationId(conversationId);
-    };
+    }, []);
+
+    // Toggle sidebar
+    const toggleSidebar = useCallback(() => {
+        setSidebarOpen(prev => !prev);
+    }, []);
 
     return (
         <div className={`${styles.chatContainer} ${isEmbedded ? styles.chatContainerEmbedded : ''}`}>
@@ -61,6 +76,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                 onToggle={toggleSidebar}
                 activeConversationId={activeConversationId}
                 onConversationSelect={handleConversationSelect}
+                onConversationsLoad={handleConversationsLoad}
+                onNewConversation={handleNewConversation}
             />
             <ChatMain
                 sidebarOpen={sidebarOpen}

@@ -5,7 +5,7 @@ import {
     tokens,
 } from '@fluentui/react-components';
 import { Add24Regular, ClipboardTaskListLtr24Regular, PanelLeft24Regular } from '@fluentui/react-icons';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apiService, type Conversation } from '../services/api';
 import { AccessTokenManager } from '../utils/cookie';
 import { MeetingModal } from './MeetingModal';
@@ -138,6 +138,8 @@ interface ConversationsSidebarProps {
     onToggle: () => void;
     activeConversationId?: string | null;
     onConversationSelect?: (conversationId: string) => void;
+    onConversationsLoad?: (conversations: Conversation[]) => void;
+    onNewConversation?: (conversation: Conversation) => void;
 }
 
 export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
@@ -145,27 +147,42 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
     isMobile,
     onToggle,
     activeConversationId,
-    onConversationSelect
+    onConversationSelect,
+    onConversationsLoad,
+    onNewConversation
 }) => {
     const styles = useStyles();
+    const sidebarRef = useRef<HTMLDivElement>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+    const [isInitialized, setIsInitialized] = useState(false);
 
     const currentUserId = userInfo?.id;
-
-    useEffect(() => {
-        if (currentUserId) {
-            loadConversations();
-        }
-    }, [currentUserId]);
 
     useEffect(() => {
         if (AccessTokenManager.hasAccessToken()) {
             loadUserInfo();
         }
     }, []);
+
+    // Handle click outside to close sidebar on mobile
+    useEffect(() => {
+        if (!isMobile || !isOpen || !sidebarRef.current) return;
+
+        const handleClickOutside = (event: MouseEvent) => {
+            // Close sidebar if clicking outside of it (including overlay)
+            if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+                onToggle();
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isMobile, isOpen, onToggle]);
 
     const loadUserInfo = async () => {
         if (!AccessTokenManager.hasAccessToken()) {
@@ -182,24 +199,38 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
         }
     };
 
-    const loadConversations = async () => {
+    const loadConversations = useCallback(async () => {
+        if (isInitialized) return;
+
         setIsLoading(true);
         try {
             const conversationsData = await apiService.getConversations();
             setConversations(conversationsData);
+            setIsInitialized(true);
+
+            if (onConversationsLoad) {
+                onConversationsLoad(conversationsData);
+            }
         } catch (error) {
             console.error('Error loading conversations:', error);
+            setIsInitialized(true);
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [onConversationsLoad, isInitialized]);
 
+    const createNewConversation = useCallback(async () => {
+        if (isInitialized && conversations.length > 0) return;
 
-    const createNewConversation = async () => {
         setIsLoading(true);
         try {
             const newConversation = await apiService.createConversation('New Conversation');
             setConversations(prev => [newConversation, ...prev]);
+            setIsInitialized(true);
+
+            if (onNewConversation) {
+                onNewConversation(newConversation);
+            }
             if (onConversationSelect) {
                 onConversationSelect(newConversation.id);
             }
@@ -208,21 +239,35 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [onNewConversation, onConversationSelect, isInitialized, conversations.length]);
 
-    const selectConversation = (conversationId: string) => {
+    const selectConversation = useCallback((conversationId: string) => {
         if (onConversationSelect) {
             onConversationSelect(conversationId);
         }
-    };
+    }, [onConversationSelect]);
 
-    const openMeetingIndexModal = () => {
+    const openMeetingIndexModal = useCallback(() => {
         setIsMeetingModalOpen(true);
-    };
+    }, []);
 
-    const closeMeetingModal = () => {
+    const closeMeetingModal = useCallback(() => {
         setIsMeetingModalOpen(false);
-    };
+    }, []);
+
+    // Initialize conversations only once when user is available and not initialized yet
+    useEffect(() => {
+        if (currentUserId && !isInitialized) {
+            loadConversations();
+        }
+    }, [currentUserId, isInitialized, loadConversations]);
+
+    // Handle conversations loaded - check if need to create new one (only once)
+    useEffect(() => {
+        if (isInitialized && !isLoading && conversations.length === 0 && currentUserId) {
+            createNewConversation();
+        }
+    }, [isInitialized, isLoading, conversations.length, currentUserId, createNewConversation]);
 
     const sidebarClasses = [
         styles.sidebar,
@@ -232,7 +277,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
     ].filter(Boolean).join(' ');
 
     return (
-        <div className={sidebarClasses}>
+        <div className={sidebarClasses} ref={sidebarRef}>
             {isMobile && isOpen && (
                 <div
                     style={{
