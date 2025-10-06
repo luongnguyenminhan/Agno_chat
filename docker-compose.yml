@@ -73,6 +73,19 @@ services:
       - redis_data:/data
     command: redis-server --appendonly yes
 
+  redisinsight:
+    image: redis/redisinsight
+    ports:
+      - "5540:5540"
+    restart: unless-stopped
+    networks:
+      - securescribe-net
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+
 networks:
   securescribe-net:
     driver: bridge
