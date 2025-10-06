@@ -1,42 +1,59 @@
-import Cookies from 'js-cookie';
-const USER_ID_COOKIE_KEY = 'chat_user_id';
-const COOKIE_EXPIRES_DAYS = 30;
+
+const ACCESS_TOKEN_KEY = 'chat_access_token';
+const USER_ID_KEY = 'chat_user_id';
+
+export class AccessTokenManager {
+    static getAccessToken(): string | null {
+        try {
+            return localStorage.getItem(ACCESS_TOKEN_KEY) || null;
+        } catch {
+            return null;
+        }
+    }
+
+    static setAccessToken(token: string): void {
+        try {
+            localStorage.setItem(ACCESS_TOKEN_KEY, token);
+        } catch (error) {
+            console.error('Cannot set access token:', error);
+        }
+    }
+
+    static clearAccessToken(): void {
+        try {
+            localStorage.removeItem(ACCESS_TOKEN_KEY);
+        } catch (error) {
+            console.error('Cannot clear access token:', error);
+        }
+    }
+
+    static hasAccessToken(): boolean {
+        return !!this.getAccessToken();
+    }
+}
 
 export class UserIdManager {
-    static getUserId(): string {
-        // Try to get from cookie first, fallback to default
-        const cookieUserId = Cookies.get(USER_ID_COOKIE_KEY);
-        return cookieUserId || '4c3b4f0f-8d99-42cd-9676-8a16a974c507';
+    static getUserId(): string | null {
+        try {
+            return localStorage.getItem(USER_ID_KEY) || null;
+        } catch {
+            return null;
+        }
     }
 
     static setUserId(userId: string): void {
-        if (userId && userId.trim()) {
-            Cookies.set(USER_ID_COOKIE_KEY, userId.trim(), {
-                expires: COOKIE_EXPIRES_DAYS,
-                sameSite: 'strict'
-            });
+        try {
+            localStorage.setItem(USER_ID_KEY, userId);
+        } catch (error) {
+            console.error('Cannot set user ID:', error);
         }
     }
 
     static clearUserId(): void {
-        Cookies.remove(USER_ID_COOKIE_KEY);
-    }
-
-    static generateNewUserId(): string {
-        // Generate a random UUID v4
-        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-            return crypto.randomUUID();
+        try {
+            localStorage.removeItem(USER_ID_KEY);
+        } catch (error) {
+            console.error('Cannot clear user ID:', error);
         }
-
-        // Fallback UUID v4 generator for older browsers
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    }
-
-    static hasUserId(): boolean {
-        return !!Cookies.get(USER_ID_COOKIE_KEY);
     }
 }

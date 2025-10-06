@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // API service layer for chat application
 // Use environment variable for API base URL, fallback to relative path for development
-const API_BASE = typeof __API_BASE_URL__ !== 'undefined'
-    ? `${__API_BASE_URL__}/api/v1`
-    : '/api/v1';
+// const API_BASE = typeof __API_BASE_URL__ !== 'undefined'
+//     ? `${__API_BASE_URL__}/api/v1`
+//     : '/api/v1';
+import { AccessTokenManager, UserIdManager } from '../utils/cookie';
 
+const API_BASE = 'https://chat.wc504.io.vn/api/v1';
 export interface Conversation {
     id: string;
     title: string;
@@ -65,9 +67,17 @@ class ApiService {
     }
 
     private getHeaders(): HeadersInit {
-        return {
+        const headers: HeadersInit = {
             'current-user-id': this.userId,
         };
+
+        // Add Authorization header if access token is available
+        const accessToken = AccessTokenManager.getAccessToken();
+        if (accessToken) {
+            headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+
+        return headers;
     }
 
     // Conversation APIs
@@ -229,6 +239,32 @@ class ApiService {
     disconnectSSE(eventSource: EventSource | null) {
         if (eventSource) {
             eventSource.close();
+        }
+    }
+
+    // User APIs
+    async getUserInfo(): Promise<any> {
+        try {
+            const response = await fetch(`https://frecord.dev.meobeo.ai/api/v1/users/me`, {
+                headers: this.getHeaders(),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch user info: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // Save user ID from response
+            if (data?.data?.id) {
+                UserIdManager.setUserId(data.data.id);
+                this.setUserId(data.data.id);
+            }
+
+            return data;
+        } catch (error) {
+            console.error('Error fetching user info:', error);
+            throw error;
         }
     }
 

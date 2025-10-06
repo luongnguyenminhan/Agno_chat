@@ -1,17 +1,14 @@
-import React, { useState, useEffect } from 'react';
 import {
-    makeStyles,
-    tokens,
     Button,
-    Input,
+    makeStyles,
     Text,
+    tokens,
 } from '@fluentui/react-components';
-import { Add24Regular, CubeMultiple24Regular, ClipboardTaskListLtr24Regular, PanelLeft24Regular } from '@fluentui/react-icons';
-import { MeetingModal } from './MeetingModal';
+import { Add24Regular, ClipboardTaskListLtr24Regular, PanelLeft24Regular } from '@fluentui/react-icons';
+import React, { useEffect, useState } from 'react';
 import { apiService, type Conversation } from '../services/api';
-import { useUser } from '../hooks/useUser';
-import type { UserContextType } from '../contexts/userContext.types';
-import { UserIdManager } from '../utils/cookie';
+import { AccessTokenManager } from '../utils/cookie';
+import { MeetingModal } from './MeetingModal';
 
 const useStyles = makeStyles({
     sidebar: {
@@ -57,30 +54,6 @@ const useStyles = makeStyles({
         fontWeight: tokens.fontWeightSemibold,
         color: tokens.colorNeutralForeground1,
         marginBottom: tokens.spacingVerticalM,
-    },
-    userIdContainer: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: tokens.spacingVerticalXXS,
-    },
-    userIdLabel: {
-        fontSize: tokens.fontSizeBase200,
-        fontWeight: tokens.fontWeightMedium,
-        color: tokens.colorNeutralForeground2,
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-    },
-    userIdInputWrapper: {
-        display: 'flex',
-        gap: tokens.spacingHorizontalXS,
-        alignItems: 'center',
-    },
-    userIdInput: {
-        flex: 1,
-    },
-    generateUuidBtn: {
-        minWidth: '40px',
-        padding: tokens.spacingHorizontalXS,
     },
     newChatBtn: {
         width: '100%',
@@ -134,6 +107,31 @@ const useStyles = makeStyles({
 
 // Using Conversation interface from api.ts
 
+interface UserInfo {
+    id: string;
+    email: string;
+    role: string;
+    name: string;
+    username: string;
+    confirmed: boolean;
+    create_date: string;
+    update_date: string;
+    profile_picture?: string;
+    first_name: string;
+    last_login_at?: string;
+    is_first_login: boolean;
+    last_name: string;
+    locale: string;
+    oauth_id?: string;
+    oauth_provider?: string;
+    sso_provider?: string;
+    sso_id?: string;
+    fish_balance: number;
+    access_token: string;
+    refresh_token: string;
+    token_type: string;
+}
+
 interface ConversationsSidebarProps {
     isOpen: boolean;
     isMobile: boolean;
@@ -150,14 +148,39 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
     onConversationSelect
 }) => {
     const styles = useStyles();
-    const { userId, setUserId }: UserContextType = useUser();
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+
+    const currentUserId = userInfo?.id;
 
     useEffect(() => {
-        loadConversations();
-    }, [userId]);
+        if (currentUserId) {
+            loadConversations();
+        }
+    }, [currentUserId]);
+
+    useEffect(() => {
+        if (AccessTokenManager.hasAccessToken()) {
+            loadUserInfo();
+        }
+    }, []);
+
+    const loadUserInfo = async () => {
+        if (!AccessTokenManager.hasAccessToken()) {
+            return;
+        }
+
+        try {
+            const userData = await apiService.getUserInfo();
+            if (userData && userData.data) {
+                setUserInfo(userData.data);
+            }
+        } catch (error) {
+            console.error('Failed to load user info:', error);
+        }
+    };
 
     const loadConversations = async () => {
         setIsLoading(true);
@@ -171,12 +194,6 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
         }
     };
 
-    const generateRandomUuid = () => {
-        const newUuid = UserIdManager.generateNewUserId();
-        // Save to cookie and update context immediately
-        UserIdManager.setUserId(newUuid);
-        setUserId(newUuid);
-    };
 
     const createNewConversation = async () => {
         setIsLoading(true);
@@ -242,24 +259,40 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                         />
                     )}
                 </div>
-
-                <div className={styles.userIdContainer}>
-                    <Text className={styles.userIdLabel}>ID người dùng:</Text>
-                    <div className={styles.userIdInputWrapper}>
-                        <Input
-                            className={styles.userIdInput}
-                            value={userId}
-                            onChange={(_, data) => setUserId(data.value)}
-                            placeholder="Nhập ID người dùng của bạn"
-                        />
-                        <Button
-                            className={styles.generateUuidBtn}
-                            icon={<CubeMultiple24Regular />}
-                            onClick={generateRandomUuid}
-                            title="Tạo UUID ngẫu nhiên"
-                        />
+                {userInfo && (
+                    <div style={{
+                        padding: `${tokens.spacingVerticalM} ${tokens.spacingVerticalL}`,
+                        borderBottom: `1px solid ${tokens.colorNeutralStroke3}`,
+                        backgroundColor: tokens.colorNeutralBackground1
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS }}>
+                            <div style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '50%',
+                                backgroundColor: tokens.colorBrandBackground,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: tokens.fontSizeBase400,
+                                fontWeight: tokens.fontWeightSemibold,
+                                color: tokens.colorNeutralForegroundInverted
+                            }}>
+                                {userInfo.first_name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <Text style={{ fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold }}>
+                                    {userInfo.name}
+                                </Text>
+                                <div>
+                                    <Text style={{ fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 }}>
+                                        {userInfo.email}
+                                    </Text>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <Button
                     className={styles.newChatBtn}
@@ -279,7 +312,11 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
             </div>
 
             <div className={styles.conversationsList}>
-                {isLoading ? (
+                {!currentUserId ? (
+                    <div style={{ padding: tokens.spacingVerticalL, textAlign: 'center' }}>
+                        <Text>Vui lòng đăng nhập để tiếp tục</Text>
+                    </div>
+                ) : isLoading ? (
                     <div style={{ padding: tokens.spacingVerticalL, textAlign: 'center' }}>
                         <Text>Đang tải cuộc trò chuyện...</Text>
                     </div>
@@ -309,7 +346,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                 )}
             </div>
 
-            <MeetingModal isOpen={isMeetingModalOpen} onClose={closeMeetingModal} />
+            <MeetingModal isOpen={isMeetingModalOpen} onClose={closeMeetingModal} userId={currentUserId} />
         </div>
     );
 };

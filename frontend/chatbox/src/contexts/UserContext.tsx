@@ -1,6 +1,5 @@
 import React, { useState, useEffect, type ReactNode } from 'react';
 import { apiService } from '../services/api';
-import { UserIdManager } from '../utils/cookie';
 import { UserContext, type UserContextType } from './userContext.types';
 
 interface UserProviderProps {
@@ -8,7 +7,7 @@ interface UserProviderProps {
 }
 
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
-    const [userId, setUserIdState] = useState(UserIdManager.getUserId());
+    const [userId, setUserIdState] = useState<string>('');
 
     useEffect(() => {
         // Sync API service with current user ID from cookie
@@ -17,12 +16,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
     const setUserId = (newUserId: string) => {
         const trimmedUserId = newUserId.trim();
-        if (trimmedUserId) {
-            // Save to cookie and update state
-            UserIdManager.setUserId(trimmedUserId);
-            setUserIdState(trimmedUserId);
-            // API service will be updated via useEffect
-        }
+        setUserIdState(trimmedUserId);
+        // API service will be updated via useEffect
     };
 
     return (

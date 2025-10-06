@@ -1,23 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState } from 'react';
 import {
-    makeStyles,
-    tokens,
     Button,
-    Input,
-    Text,
     Dialog,
-    DialogSurface,
-    DialogTitle,
-    DialogContent,
     DialogActions,
     DialogBody,
+    DialogContent,
+    DialogSurface,
+    DialogTitle,
+    Input,
+    makeStyles,
+    Text,
     Textarea,
+    tokens,
 } from '@fluentui/react-components';
 import { CubeMultiple24Regular } from '@fluentui/react-icons';
+import React, { useState } from 'react';
 import { apiService } from '../services/api';
-import { useUser } from '../hooks/useUser';
-import type { UserContextType } from '../contexts/userContext.types';
 
 const useStyles = makeStyles({
     modal: {
@@ -131,11 +129,11 @@ const useStyles = makeStyles({
 interface MeetingModalProps {
     isOpen: boolean;
     onClose: () => void;
+    userId?: string;
 }
 
-export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) => {
+export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, userId }) => {
     const styles = useStyles();
-    const { userId }: UserContextType = useUser();
     const [meetingId, setMeetingId] = useState('');
     const [transcript, setTranscript] = useState('');
     const [notesFile, setNotesFile] = useState<File | null>(null);
@@ -195,7 +193,7 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose }) =
                 meeting_id: meetingId.trim(),
                 transcript: transcript.trim() || undefined,
                 meeting_note_file: notesFile || undefined,
-                current_user_id: userId,
+                current_user_id: userId || '',
             });
 
             if (response.success) {

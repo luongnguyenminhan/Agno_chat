@@ -66,10 +66,78 @@
   <div class="chat-bubble" id="chatToggle">💬</div>
 
   <div class="chat-popup" id="chatBox">
-    <iframe src="https://chat.wc504.io.vn/"></iframe>
+    <iframe src="http://localhost:3000/"></iframe>
   </div>
 
   <script>
+    // Set access token in cookie for iframe authentication
+    const ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE4MTk3MjUzNTcsImlhdCI6MTc1OTcyNTQxNywiaXNzIjoiZnJlY29yZC1hcGkiLCJhdWQiOiJmcmVjb3JkLWNsaWVudCIsInVzZXJfaWQiOiJjNmIyNzMxMC1lYmQwLTQ3OGUtOWUyYi03YTFlZWY0MDNiODciLCJlbWFpbCI6ImFubG5tQGZwdC5jb20iLCJyb2xlIjoidXNlciJ9.7uSWfTxw4O7j1-Q1K82CVbDUQxcV7MBV7v_ksz6O4SQ";
+
+    // Function to set cookie with proper attributes for cross-origin iframe
+    function setCookie(name, value, days = 30) {
+      const expires = new Date();
+      expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+
+      // For cross-origin iframe access, need proper domain and path
+      const domain = window.location.hostname;
+      const isSecure = window.location.protocol === 'https:';
+
+      let cookieString = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+
+      // Add domain for cross-origin access - use .domain for subdomain access
+      if (domain !== 'localhost') {
+        // For cross-origin iframe, we need to set domain to allow iframe access
+        // But this might not work if iframe is on different domain
+        cookieString += `;domain=.${domain}`;
+      }
+
+      // SameSite=None requires Secure flag for cross-origin
+      if (isSecure) {
+        cookieString += `;SameSite=None;Secure`;
+      } else {
+        cookieString += `;SameSite=Lax`;
+      }
+
+      console.log('🍪 Setting cookie for PARENT window:', cookieString);
+      console.log('🍪 Domain:', domain);
+      console.log('🍪 Is secure:', isSecure);
+      document.cookie = cookieString;
+
+      // Also try to set cookie without domain for local development
+      if (domain === 'localhost') {
+        const localCookieString = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+        console.log('🍪 Also setting local cookie:', localCookieString);
+        document.cookie = localCookieString;
+      }
+    }
+
+    // Set access token cookie
+    setCookie('chat_access_token', ACCESS_TOKEN);
+
+    // Send token to iframe via postMessage after it loads
+    function sendTokenToIframe() {
+        const iframe = document.getElementById('chatBox').querySelector('iframe');
+        if (iframe && iframe.contentWindow) {
+            console.log('📤 Sending token to iframe via postMessage');
+            iframe.contentWindow.postMessage({
+                type: 'SET_ACCESS_TOKEN',
+                token: ACCESS_TOKEN,
+                source: 'parent'
+            }, '*');
+        }
+    }
+
+    // Send token when iframe is ready
+    document.getElementById('chatBox').querySelector('iframe').addEventListener('load', sendTokenToIframe);
+
+    // Listen for token requests from iframe
+    window.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'REQUEST_TOKEN') {
+            console.log('📨 Received token request from iframe, sending token...');
+            sendTokenToIframe();
+        }
+    });
+
     const chatToggle = document.getElementById("chatToggle");
     const chatBox = document.getElementById("chatBox");
 
