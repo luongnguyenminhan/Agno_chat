@@ -7,6 +7,16 @@
     <meta name="description" content="A modern React Single Page Application built with TypeScript and Vite" />
     <meta name="theme-color" content="#ffffff" />
     <title>Trợ lý trò chuyện</title>
+    <script src="/public/token-receiver.js"></script>
+    <!-- Đảm bảo global classes có sẵn trước khi React khởi tạo -->
+    <script>
+      // Đợi token-receiver.js load xong rồi mới khởi tạo React app
+      document.addEventListener('DOMContentLoaded', function() {
+        if (typeof AccessTokenManager !== 'undefined' && typeof UserIdManager !== 'undefined') {
+          console.log('✅ Token managers đã sẵn sàng trước khi React khởi tạo');
+        }
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>

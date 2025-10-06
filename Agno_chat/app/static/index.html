@@ -7,13 +7,23 @@
     <meta name="description" content="A modern React Single Page Application built with TypeScript and Vite" />
     <meta name="theme-color" content="#ffffff" />
     <title>Trợ lý trò chuyện</title>
-    <script type="module" crossorigin src="/assets/index-BS9P3-dB.js"></script>
+    <script src="/public/token-receiver.js"></script>
+    <!-- Đảm bảo global classes có sẵn trước khi React khởi tạo -->
+    <script>
+      // Đợi token-receiver.js load xong rồi mới khởi tạo React app
+      document.addEventListener('DOMContentLoaded', function() {
+        if (typeof AccessTokenManager !== 'undefined' && typeof UserIdManager !== 'undefined') {
+          console.log('✅ Token managers đã sẵn sàng trước khi React khởi tạo');
+        }
+      });
+    </script>
+    <script type="module" crossorigin src="/assets/index-BQPZWJAV.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-BBZsY560.js">
     <link rel="modulepreload" crossorigin href="/assets/chat-components-oW8zPVyv.js">
     <link rel="modulepreload" crossorigin href="/assets/fluent-ui-BlYyKWF3.js">
     <link rel="modulepreload" crossorigin href="/assets/react-vendor-NdxlWO22.js">
-    <link rel="modulepreload" crossorigin href="/assets/services-BA4AZ_-N.js">
-    <link rel="modulepreload" crossorigin href="/assets/ui-components-CF8dOX7q.js">
+    <link rel="modulepreload" crossorigin href="/assets/services-Bx7AXeOz.js">
+    <link rel="modulepreload" crossorigin href="/assets/ui-components-CtKui5EO.js">
     <link rel="stylesheet" crossorigin href="/assets/index-BhL3BwPz.css">
   </head>
   <body>

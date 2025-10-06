@@ -1,34 +1,14 @@
-<!DOCTYPE h    .chat-bubble {
-      position: absolute;
-      left: calc(100vw - 80px);
-      top: calc(100vh - 80px);
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background-color: #4CAF50;
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      cursor: pointer;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-      z-index: 1000;
-      transition: left 0.1s ease, top 0.1s ease;
-      will-change: left, top;
-    }"vi">
+<!DOCTYPE html>
+<html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Hộp trò chuyện nổi</title>
+  <title>Chat Bubble</title>
   <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-    }
-    /* bubble tròn */
+    body { margin: 0; }
     .chat-bubble {
-      position: absolute;
-      left: calc(100vw - 80px);
-      top: calc(100vh - 80px);
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
       width: 60px;
       height: 60px;
       border-radius: 50%;
@@ -37,24 +17,24 @@
       display: flex;
       justify-content: center;
       align-items: center;
+      font-size: 24px;
       cursor: pointer;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-      z-index: 1000;
-      transition: left 0.1s ease, top 0.1s ease;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      z-index: 9999;
     }
-    /* chatbox popup */
     .chat-popup {
-      position: absolute;
+      position: fixed;
+      bottom: 100px;
+      right: 20px;
       width: 500px;
       height: 800px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      overflow: hidden;
       display: none;
+      border-radius: 10px;
+      overflow: hidden;
       box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-      z-index: 1000;
+      z-index: 9999;
     }
-    .chat-popup iframe {
+    iframe {
       width: 100%;
       height: 100%;
       border: none;
@@ -62,143 +42,48 @@
   </style>
 </head>
 <body>
-
   <div class="chat-bubble" id="chatToggle">💬</div>
-
   <div class="chat-popup" id="chatBox">
-    <iframe src="http://localhost:3000/"></iframe>
+    <iframe id="chatIframe" src="https://chat.wc504.io.vn"></iframe>
   </div>
 
   <script>
-    // Set access token in cookie for iframe authentication
     const ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE4MTk3MjUzNTcsImlhdCI6MTc1OTcyNTQxNywiaXNzIjoiZnJlY29yZC1hcGkiLCJhdWQiOiJmcmVjb3JkLWNsaWVudCIsInVzZXJfaWQiOiJjNmIyNzMxMC1lYmQwLTQ3OGUtOWUyYi03YTFlZWY0MDNiODciLCJlbWFpbCI6ImFubG5tQGZwdC5jb20iLCJyb2xlIjoidXNlciJ9.7uSWfTxw4O7j1-Q1K82CVbDUQxcV7MBV7v_ksz6O4SQ";
-
-    // Function to set cookie with proper attributes for cross-origin iframe
-    function setCookie(name, value, days = 30) {
-      const expires = new Date();
-      expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-
-      // For cross-origin iframe access, need proper domain and path
-      const domain = window.location.hostname;
-      const isSecure = window.location.protocol === 'https:';
-
-      let cookieString = `${name}=${value};expires=${expires.toUTCString()};path=/`;
-
-      // Add domain for cross-origin access - use .domain for subdomain access
-      if (domain !== 'localhost') {
-        // For cross-origin iframe, we need to set domain to allow iframe access
-        // But this might not work if iframe is on different domain
-        cookieString += `;domain=.${domain}`;
-      }
-
-      // SameSite=None requires Secure flag for cross-origin
-      if (isSecure) {
-        cookieString += `;SameSite=None;Secure`;
-      } else {
-        cookieString += `;SameSite=Lax`;
-      }
-
-      console.log('🍪 Setting cookie for PARENT window:', cookieString);
-      console.log('🍪 Domain:', domain);
-      console.log('🍪 Is secure:', isSecure);
-      document.cookie = cookieString;
-
-      // Also try to set cookie without domain for local development
-      if (domain === 'localhost') {
-        const localCookieString = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
-        console.log('🍪 Also setting local cookie:', localCookieString);
-        document.cookie = localCookieString;
-      }
-    }
-
-    // Set access token cookie
-    setCookie('chat_access_token', ACCESS_TOKEN);
-
-    // Send token to iframe via postMessage after it loads
-    function sendTokenToIframe() {
-        const iframe = document.getElementById('chatBox').querySelector('iframe');
-        if (iframe && iframe.contentWindow) {
-            console.log('📤 Sending token to iframe via postMessage');
-            iframe.contentWindow.postMessage({
-                type: 'SET_ACCESS_TOKEN',
-                token: ACCESS_TOKEN,
-                source: 'parent'
-            }, '*');
-        }
-    }
-
-    // Send token when iframe is ready
-    document.getElementById('chatBox').querySelector('iframe').addEventListener('load', sendTokenToIframe);
-
-    // Listen for token requests from iframe
-    window.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'REQUEST_TOKEN') {
-            console.log('📨 Received token request from iframe, sending token...');
-            sendTokenToIframe();
-        }
-    });
+    const USER_ID = "c6b27310-ebd0-478e-9e2b-7a1eef403b87";
 
     const chatToggle = document.getElementById("chatToggle");
     const chatBox = document.getElementById("chatBox");
+    const iframe = document.getElementById("chatIframe");
 
-    let isDragging = false;
-    let dragOffsetX, dragOffsetY;
+    chatToggle.addEventListener("click", () => {
+      chatBox.style.display = chatBox.style.display === "block" ? "none" : "block";
+    });
 
-    function snapToNearestEdge() {
-      const centerX = chatToggle.offsetLeft + 30;
-      const centerY = chatToggle.offsetTop + 30;
-      const distTop = centerY;
-      const distBottom = window.innerHeight - centerY;
-      const distLeft = centerX;
-      const distRight = window.innerWidth - centerX;
-      const minDist = Math.min(distTop, distBottom, distLeft, distRight);
-      if (minDist === distTop) {
-        chatToggle.style.top = "20px";
-      } else if (minDist === distBottom) {
-        chatToggle.style.top = (window.innerHeight - 80) + "px";
-      } else if (minDist === distLeft) {
-        chatToggle.style.left = "20px";
-      } else {
-        chatToggle.style.left = (window.innerWidth - 80) + "px";
-      }
-    }
+    // Gửi token khi iframe load xong
+    iframe.addEventListener("load", () => {
+      console.log("📤 Gửi token qua iframe...");
+      iframe.contentWindow.postMessage({
+        type: "SET_TOKEN",
+        token: ACCESS_TOKEN,
+        userId: USER_ID
+      }, "https://chat.wc504.io.vn");
+    });
 
-    function positionPopup() {
-      const toggleRect = chatToggle.getBoundingClientRect();
-      const boxWidth = 500;
-      const boxHeight = 800;
-      const spacing = 20;
-
-      let left = toggleRect.left - boxWidth - spacing;
-      let top = toggleRect.top - boxHeight + toggleRect.height;
-
-      if (left < 0) {
-        left = toggleRect.right + spacing;
-      }
-      if (top < 0) {
-        top = toggleRect.bottom + spacing;
-      }
-      if (left + boxWidth > window.innerWidth) {
-        left = window.innerWidth - boxWidth - spacing;
-      }
-      if (top + boxHeight > window.innerHeight) {
-        top = window.innerHeight - boxHeight - spacing;
-      }
-
-      chatBox.style.left = left + "px";
-      chatBox.style.top = top + "px";
-    }
-
-    chatToggle.addEventListener("click", (e) => {
-      if (!isDragging) {
-        if (chatBox.style.display === "none" || chatBox.style.display === "") {
-          positionPopup();
-          chatBox.style.display = "block";
-        } else {
-          chatBox.style.display = "none";
-        }
+    // Nếu iframe chủ động yêu cầu lại token
+    window.addEventListener("message", (event) => {
+      if (event.origin !== "https://chat.wc504.io.vn") return;
+      if (event.data?.type === "REQUEST_TOKEN") {
+        iframe.contentWindow.postMessage({
+          type: "SET_TOKEN",
+          token: ACCESS_TOKEN,
+          userId: USER_ID
+        }, "https://chat.wc504.io.vn");
       }
     });
+
+    // Drag and drop functionality (giữ lại để tiện)
+    let isDragging = false;
+    let dragOffsetX, dragOffsetY;
 
     chatToggle.addEventListener("mousedown", (e) => {
       isDragging = true;
@@ -219,7 +104,6 @@
 
     document.addEventListener("mouseup", () => {
       if (isDragging) {
-        snapToNearestEdge();
         isDragging = false;
       }
     });
