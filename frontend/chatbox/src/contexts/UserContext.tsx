@@ -1,5 +1,6 @@
 import React, { useState, useEffect, type ReactNode } from 'react';
 import { apiService } from '../services/api';
+import { UserIdManager } from '../utils/cookie';
 import { UserContext, type UserContextType } from './userContext.types';
 
 interface UserProviderProps {
@@ -7,7 +8,10 @@ interface UserProviderProps {
 }
 
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
-    const [userId, setUserIdState] = useState<string>('');
+    // Load user ID từ localStorage ngay khi khởi tạo để đảm bảo sớm nhất
+    const [userId, setUserIdState] = useState<string>(() => {
+        return UserIdManager.getUserId() || '';
+    });
 
     useEffect(() => {
         // Sync API service with current user ID from cookie

@@ -1,4 +1,5 @@
 
+// Token management using localStorage (consistent with token-receiver.js)
 const ACCESS_TOKEN_KEY = 'chat_access_token';
 const USER_ID_KEY = 'chat_user_id';
 
@@ -57,3 +58,6 @@ export class UserIdManager {
         }
     }
 }
+
+// Note: AccessTokenManager và UserIdManager được expose từ token-receiver.js
+// và có thể truy cập qua window.AccessTokenManager, window.UserIdManager
