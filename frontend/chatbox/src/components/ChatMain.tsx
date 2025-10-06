@@ -3,13 +3,13 @@ import {
     Button,
     makeStyles,
     Text,
-    Textarea,
     tokens,
 } from '@fluentui/react-components';
-import { PanelRight24Regular, Send24Regular } from '@fluentui/react-icons';
+import { PanelRight24Regular } from '@fluentui/react-icons';
 import React, { useEffect, useRef, useState, Suspense, lazy } from 'react';
 import { apiService } from '../services/api';
 import type { Message } from '../services/api';
+import { ChatInput } from './ChatInput';
 
 // Lazy load the ChatMessage component to reduce initial bundle size
 const ChatMessage = lazy(() => import('./ChatMessage').then(module => ({ default: module.ChatMessage })));
@@ -92,30 +92,6 @@ const useStyles = makeStyles({
         backgroundColor: tokens.colorNeutralBackground3,
         color: tokens.colorNeutralForeground1,
     },
-    typingIndicator: {
-        padding: `${tokens.spacingVerticalS} ${tokens.spacingVerticalL}`,
-        fontSize: tokens.fontSizeBase300,
-        color: tokens.colorNeutralForeground2,
-        fontStyle: 'italic',
-    },
-    messageInputArea: {
-        padding: tokens.spacingVerticalL,
-        borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
-        backgroundColor: tokens.colorNeutralBackground1,
-    },
-    messageInputContainer: {
-        display: 'flex',
-        gap: tokens.spacingHorizontalS,
-        alignItems: 'flex-end',
-    },
-    messageInput: {
-        flex: 1,
-        minHeight: '44px',
-        resize: 'none',
-    },
-    sendBtn: {
-        minHeight: '44px',
-    },
 });
 
 interface ChatMainProps {
@@ -140,13 +116,11 @@ export const ChatMain: React.FC<ChatMainProps> = ({
     ].filter(Boolean).join(' ');
 
     const [messages, setMessages] = useState<Message[]>([]);
-    const [currentMessage, setCurrentMessage] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
     const [conversationTitle, setConversationTitle] = useState('Chọn một cuộc trò chuyện để bắt đầu chat');
     const [eventSource, setEventSource] = useState<EventSource | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -180,7 +154,6 @@ export const ChatMain: React.FC<ChatMainProps> = ({
 
     const loadConversationMessages = async (conversationId: string) => {
         try {
-            setIsTyping(true);
             const messagesData = await apiService.getConversationMessages(conversationId);
             setMessages(messagesData);
 
@@ -189,8 +162,6 @@ export const ChatMain: React.FC<ChatMainProps> = ({
         } catch (error) {
             console.error('Error loading conversation messages:', error);
             setConversationTitle('Lỗi khi tải cuộc trò chuyện');
-        } finally {
-            setIsTyping(false);
         }
     };
 
@@ -200,7 +171,6 @@ export const ChatMain: React.FC<ChatMainProps> = ({
         try {
             const newEventSource = apiService.connectToConversation(conversationId, (message: Message) => {
                 setMessages(prev => [...prev, message]);
-                setIsTyping(false); // Hide typing indicator when message arrives
             });
 
             setEventSource(newEventSource);
@@ -219,19 +189,8 @@ export const ChatMain: React.FC<ChatMainProps> = ({
         }
     };
 
-    const handleSendMessage = async () => {
-        if (!currentMessage.trim() || !activeConversationId) return;
-
-        const content = currentMessage.trim();
-        setCurrentMessage('');
-
-        // Auto-resize textarea back to single line
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-        }
-
-        // Parse mentions from content
-        const mentions = apiService.parseMentions(content);
+    const handleSendMessage = async (content: string, mentions: Array<{ entity_type: string; entity_id: string; offset_start: number; offset_end: number }>) => {
+        if (!activeConversationId) return;
 
         // Create optimistic user message
         const optimisticMessage: Message = {
@@ -246,9 +205,13 @@ export const ChatMain: React.FC<ChatMainProps> = ({
 
         try {
             setIsTyping(true);
+
+            // Resolve meeting mentions if needed (handle RESOLVE: format)
+            const resolvedMentions = await apiService.resolveMeetingMentions(mentions);
+
             await apiService.sendMessage(activeConversationId, {
                 content,
-                mentions,
+                mentions: resolvedMentions,
             });
 
             // Real-time update will handle the actual message from server
@@ -259,25 +222,8 @@ export const ChatMain: React.FC<ChatMainProps> = ({
             // Remove optimistic message on error
             setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
 
-            // Restore the message content if sending failed
-            setCurrentMessage(content);
-        }
-    };
-
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSendMessage();
-        }
-    };
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setCurrentMessage(e.target.value);
-
-        // Auto-resize textarea
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+            // Throw error to let ChatInput handle message restoration
+            throw error;
         }
     };
 
@@ -323,33 +269,11 @@ export const ChatMain: React.FC<ChatMainProps> = ({
                 </div>
             </div>
 
-            {isTyping && (
-                <div className={styles.typingIndicator}>
-                    AI đang nhập...
-                </div>
-            )}
-
-            <div className={styles.messageInputArea}>
-                <div className={styles.messageInputContainer}>
-                    <Textarea
-                        ref={textareaRef}
-                        className={styles.messageInput}
-                        value={currentMessage}
-                        onChange={handleInputChange}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Nhập tin nhắn của bạn ở đây... (Nhấn Enter để gửi, Shift+Enter để xuống dòng)"
-                        rows={1}
-                    />
-                    <Button
-                        className={styles.sendBtn}
-                        icon={<Send24Regular />}
-                        onClick={handleSendMessage}
-                        disabled={!currentMessage.trim()}
-                    >
-                        Gửi
-                    </Button>
-                </div>
-            </div>
+            <ChatInput
+                onSendMessage={handleSendMessage}
+                disabled={!activeConversationId}
+                isTyping={isTyping}
+            />
         </div>
     );
 };

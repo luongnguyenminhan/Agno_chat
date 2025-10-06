@@ -118,15 +118,22 @@ export function ChatMessage({
 
 
   const renderContentWithMentions = (text: string, isUser: boolean) => {
-    // Highlight @meeting, @file, @project (no uuid parsing)
-    const regex = /@(?:meeting|file|project)/g;
+    // Parse @{type}{name} format and display as @name for better UX
+    const mentionRegex = /@\{(\w+)\}\{([^}]+)\}/g;
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
-    while ((match = regex.exec(text)) !== null) {
+
+    while ((match = mentionRegex.exec(text)) !== null) {
+      // Add text before mention
       if (match.index > lastIndex) {
         parts.push(text.slice(lastIndex, match.index));
       }
+
+      const [, type, name] = match;
+      // Display as @name for better readability in messages
+      const displayText = `@${name}`;
+
       parts.push(
         <strong
           key={match.index}
@@ -134,12 +141,14 @@ export function ChatMessage({
             color: isUser ? "#fff" : "#0b5cad",
             fontWeight: "bold",
           }}
+          title={`@${type}{${name}}`} // Show full format on hover
         >
-          {match[0]}
+          {displayText}
         </strong>
       );
       lastIndex = match.index + match[0].length;
     }
+
     if (lastIndex < text.length) {
       parts.push(text.slice(lastIndex));
     }

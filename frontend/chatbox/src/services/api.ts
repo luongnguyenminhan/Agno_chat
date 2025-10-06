@@ -55,6 +55,28 @@ export interface MeetingIndexResponse {
     message?: string;
 }
 
+export interface Meeting {
+    id: string;
+    title: string;
+    meeting_date: string;
+    organizer_name: string;
+    status: string;
+}
+
+export interface MeetingsResponse {
+    error_code: number;
+    message: string;
+    data: {
+        items: Meeting[];
+        paging: {
+            total: number;
+            total_pages: number;
+            page: number;
+            page_size: number;
+        };
+    };
+}
+
 class ApiService {
     private userId: string = '4c3b4f0f-8d99-42cd-9676-8a16a974c507';
 
@@ -206,6 +228,42 @@ class ApiService {
         }
     }
 
+    async searchMeetings(searchTerm: string): Promise<Meeting[]> {
+        try {
+            const baseUrl = 'https://frecord.dev.meobeo.ai/api/v1/meetings/';
+            const params = new URLSearchParams({
+                page: '1',
+                page_size: '16'
+            });
+
+            if (searchTerm.trim()) {
+                // Normalize search term to handle special characters
+                const filters = [{
+                    field: 'title',
+                    operator: 'contains',
+                    value: searchTerm
+                }];
+                params.set('filters_json', JSON.stringify(filters));
+            }
+
+            const response = await fetch(`${baseUrl}?${params.toString()}`, {
+                headers: this.getHeaders(),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to search meetings: ${response.status}`);
+            }
+
+            const data: MeetingsResponse = await response.json();
+            console.log('📥 API Response:', data);
+            console.log('🎯 Found items:', data.data?.items?.length || 0);
+            return data.data.items || [];
+        } catch (error) {
+            console.error('Error searching meetings:', error);
+            return [];
+        }
+    }
+
     // SSE connection for real-time updates
     connectToConversation(conversationId: string, onMessage: (message: Message) => void): EventSource {
         const eventSource = new EventSource(`${API_BASE}/conversations/${conversationId}/events`);
@@ -299,25 +357,39 @@ class ApiService {
     }
 
     highlightMentions(content: string): string {
-        const mentionRegex = /@(\w+):([a-f0-9-]+)/g;
+        // Updated pattern to match @{type}{name} format
+        const mentionRegex = /@\{(\w+)\}\{([^}]+)\}/g;
         return this.escapeHtml(content).replace(mentionRegex, '<span class="mention">$&</span>');
     }
 
     parseMentions(content: string): Array<{ entity_type: string; entity_id: string; offset_start: number; offset_end: number }> {
-        const mentionRegex = /@(\w+):([a-f0-9-]+)/g;
+        // Updated to handle @{type}{name} format
+        const mentionRegex = /@\{(\w+)\}\{([^}]+)\}/g;
         const mentions = [];
         let match;
 
         while ((match = mentionRegex.exec(content)) !== null) {
+            const [, entityType, entityName] = match;
             mentions.push({
-                entity_type: match[1],
-                entity_id: match[2],
+                entity_type: entityType,
+                entity_id: entityName, // Now using name directly as ID for the new format
                 offset_start: match.index,
                 offset_end: match.index + match[0].length,
             });
         }
 
         return mentions;
+    }
+
+    async resolveMeetingMentions(mentions: Array<{ entity_type: string; entity_id: string; offset_start: number; offset_end: number; original_name?: string }>): Promise<Array<{ entity_type: string; entity_id: string; offset_start: number; offset_end: number }>> {
+        // With the new @{type}{name} format, mentions are already resolved
+        // entity_id now contains the name directly, no need for resolution
+        return mentions.map(mention => ({
+            entity_type: mention.entity_type,
+            entity_id: mention.entity_id,
+            offset_start: mention.offset_start,
+            offset_end: mention.offset_end,
+        }));
     }
 }
 
