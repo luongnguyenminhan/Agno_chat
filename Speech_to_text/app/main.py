@@ -7,12 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRoute
-from fastapi.staticfiles import StaticFiles
 
 from app.api import api_router
 from app.core.config import settings
 
-# Suppress specific deprecation warnings from torchaudio/pyannote.audio
 warnings.filterwarnings("ignore", message="torchaudio._backend.list_audio_backends has been deprecated", category=UserWarning)
 warnings.filterwarnings("ignore", message=".*list_audio_backends.*deprecated.*", category=UserWarning)
 warnings.filterwarnings("ignore", message="torchaudio._backend.utils.info has been deprecated", category=UserWarning)
@@ -30,7 +28,6 @@ def custom_generate_unique_id(route: APIRoute) -> str:
     This creates cleaner method names for generated client code.
     """
     if route.tags:
-        # Use first tag + operation name for better organization
         return f"{route.tags[0]}_{route.name}"
     return route.name
 
@@ -42,7 +39,6 @@ def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
 
-    # Generate base OpenAPI schema
     openapi_schema = get_openapi(
         title=app.title,
         version=app.version,
@@ -50,19 +46,16 @@ def custom_openapi():
         routes=app.routes,
     )
 
-    # Add custom extensions
     openapi_schema["info"]["x-logo"] = {
         "url": "https://fastapi.tiangolo.com/img/logo-margin/logo-teal.png",
         "altText": "SecureScribe API Logo",
     }
 
-    # Add custom servers for different environments
     openapi_schema["servers"] = [
-        {"url": "http://localhost:9998", "description": "Development server"},
+        {"url": "http://localhost:9999", "description": "Development server"},
         {"url": "https://s2t.wc504.io.vn", "description": "Production server"},
     ]
 
-    # Add security schemes
     openapi_schema["components"]["securitySchemes"] = {
         "BearerAuth": {
             "type": "http",
@@ -72,10 +65,8 @@ def custom_openapi():
         }
     }
 
-    # Apply security globally
     openapi_schema["security"] = [{"BearerAuth": []}]
 
-    # Cache the schema
     app.openapi_schema = openapi_schema
     return openapi_schema
 
@@ -90,12 +81,10 @@ app = FastAPI(
     license_info={
         "name": "MIT",
     },
-    # Custom operation ID generation for better client code
     generate_unique_id_function=custom_generate_unique_id,
 )
 
 
-# Add middleware to log all requests
 @app.middleware("http")
 async def log_requests(request, call_next):
     print(f"[REQUEST] {request.method} {request.url}")
@@ -104,10 +93,8 @@ async def log_requests(request, call_next):
     return response
 
 
-# Override the default OpenAPI schema generator
 app.openapi = custom_openapi
 
-# Configure CORS for cross-origin requests with Authorization headers
 app.add_middleware(
     CORSMiddleware,
     allow_origins=(["*"]),
@@ -118,18 +105,14 @@ app.add_middleware(
         "PUT",
         "DELETE",
         "OPTIONS",
-    ],  # Explicitly allow methods
-    allow_headers=["*"],  # Allow all headers including Authorization
-    expose_headers=["*"],  # Expose all headers for EventSource
+    ],
+    allow_headers=["*"],
+    expose_headers=["*"],
 )
 
-# Mount API router FIRST (important for routing precedence)
 app.include_router(api_router)
 
-# Mount static files AFTER API router to avoid conflicts
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-# Serve chat application files directly for easier access
 @app.get("/chat/css", response_class=FileResponse)
 def serve_chat_css():
     """Serve chat_bubble.css file directly"""
@@ -138,6 +121,7 @@ def serve_chat_css():
         return FileResponse(file_path, media_type="text/css")
     else:
         raise HTTPException(status_code=404, detail="chat_bubble.css not found")
+
 
 @app.get("/chat/js", response_class=FileResponse)
 def serve_chat_js():
@@ -148,7 +132,7 @@ def serve_chat_js():
     else:
         raise HTTPException(status_code=404, detail="chat_bubble.js not found")
 
-# Combined chat application endpoint
+
 @app.get("/chat")
 def serve_chat_app():
     """Serve the complete chat application"""
@@ -157,9 +141,6 @@ def serve_chat_app():
         return FileResponse(file_path, media_type="text/html")
     else:
         raise HTTPException(status_code=404, detail="chat_bubble.html not found")
-
-
-
 
 
 @app.get("/health/redis")
@@ -172,10 +153,8 @@ def health_redis() -> Dict[str, Any]:
 
         redis_client = get_redis_client()
 
-        # Test connection
         redis_client.ping()
 
-        # Get Redis info
         info = redis_client.info()
         memory_info = redis_client.info("memory")
 

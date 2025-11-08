@@ -3,9 +3,6 @@ import torch._VF as _VF
 import torch.nn as nn
 import torch.nn.functional as F
 
-# Activation Functions
-from torch.nn.modules.utils import _pair
-
 
 class Linear(nn.Linear):
     def __init__(self, in_features, out_features, bias=True):
@@ -84,6 +81,7 @@ class Conv1d(nn.Conv1d):
 
         # Apply Weight
         return F.conv1d(input, weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
+
 
 class LSTM(nn.LSTM):
     def __init__(self, input_size, hidden_size, num_layers, batch_first, bidirectional):

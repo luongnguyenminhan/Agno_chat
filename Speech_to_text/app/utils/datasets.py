@@ -1,15 +1,12 @@
-
+import glob
 
 import torch
 import torchaudio
-
-# Other
-import glob
 from tqdm import tqdm
 
-class VietnameseDataset(torch.utils.data.Dataset): 
-    def __init__(self, dataset_path, training_params, tokenizer_params, split, args):
 
+class VietnameseDataset(torch.utils.data.Dataset):
+    def __init__(self, dataset_path, training_params, tokenizer_params, split, args):
         self.names = glob.glob(dataset_path + "/*/" + split + "/*.wav")
         self.vocab_type = tokenizer_params["vocab_type"]
         self.vocab_size = str(tokenizer_params["vocab_size"])
@@ -22,18 +19,15 @@ class VietnameseDataset(torch.utils.data.Dataset):
             self.names = self.filter_lengths(training_params["eval_audio_max_length"], training_params["eval_audio_max_length"], args.rank)
 
     def __getitem__(self, i):
-
         if self.lm_mode:
             return [torch.load(self.names[i].split(".wav")[0] + "." + self.vocab_type + "_" + self.vocab_size)]
         else:
             return [torchaudio.load(self.names[i])[0], torch.load(self.names[i].split(".wav")[0] + "." + self.vocab_type + "_" + self.vocab_size)]
 
     def __len__(self):
-
         return len(self.names)
 
     def filter_lengths(self, audio_max_length, label_max_length, rank=0):
-
         if audio_max_length is None or label_max_length is None:
             return self.names
 

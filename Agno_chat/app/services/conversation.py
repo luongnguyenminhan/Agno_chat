@@ -48,28 +48,10 @@ def get_conversation_with_messages(db: Session, conversation_id: uuid.UUID, user
     messages = db.query(ChatMessage).filter(ChatMessage.conversation_id == conversation_id).order_by(ChatMessage.created_at.asc()).limit(limit).all()
 
     # Convert ChatMessage objects to ChatMessageResponse objects
-    formatted_messages = [
-        ChatMessageResponse(
-            id=msg.id,
-            conversation_id=msg.conversation_id,
-            message_type=msg.message_type,
-            content=msg.content,
-            created_at=msg.created_at,
-            mentions=msg.mentions
-        )
-        for msg in messages
-    ]
+    formatted_messages = [ChatMessageResponse(id=msg.id, conversation_id=msg.conversation_id, message_type=msg.message_type, content=msg.content, created_at=msg.created_at, mentions=msg.mentions) for msg in messages]
 
     # Return a dictionary that matches the ConversationWithMessagesResponse schema
-    return {
-        "id": conversation.id,
-        "user_id": conversation.user_id,
-        "title": conversation.title,
-        "created_at": conversation.created_at,
-        "updated_at": conversation.updated_at,
-        "is_active": conversation.is_active,
-        "messages": formatted_messages
-    }
+    return {"id": conversation.id, "user_id": conversation.user_id, "title": conversation.title, "created_at": conversation.created_at, "updated_at": conversation.updated_at, "is_active": conversation.is_active, "messages": formatted_messages}
 
 
 def update_conversation(db: Session, conversation_id: uuid.UUID, user_id: uuid.UUID, update_data: ConversationUpdate) -> Optional[Conversation]:

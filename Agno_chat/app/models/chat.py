@@ -47,16 +47,14 @@ class Conversation(SQLModel, table=True):
     @hybrid_property
     def message_count(self) -> int:
         """Get the count of messages in this conversation"""
-        if hasattr(self, '_message_count_cache'):
+        if hasattr(self, "_message_count_cache"):
             return self._message_count_cache
 
         session = object_session(self)
         if session is None:
             return len(self.messages) if self.messages else 0
 
-        count = session.query(func.count(ChatMessage.id)).filter(
-            ChatMessage.conversation_id == self.id
-        ).scalar()
+        count = session.query(func.count(ChatMessage.id)).filter(ChatMessage.conversation_id == self.id).scalar()
         return count or 0
 
     @message_count.expression

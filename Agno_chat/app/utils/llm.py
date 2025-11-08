@@ -32,8 +32,10 @@ def _get_model() -> Gemini:
         api_key=settings.GOOGLE_API_KEY,
     )
 
+
 def _get_embeddings() -> GeminiEmbeddings:
     return GeminiEmbeddings(api_key=settings.GOOGLE_API_KEY)
+
 
 async def embed_query(query: str) -> List[float]:
     embeddings = _get_embeddings()
@@ -47,6 +49,7 @@ async def embed_documents(docs: List[str]) -> List[List[float]]:
     embeddings = _get_embeddings()
     vectors = embeddings.embed_batch(docs)
     return [list(v) for v in vectors]
+
 
 def get_agno_postgres_db() -> PostgresDb:
     """Get agno PostgresDb instance for session management"""

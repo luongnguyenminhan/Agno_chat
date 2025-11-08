@@ -114,7 +114,6 @@ class SpecAugment(nn.Module):
         return x
 
 
-
 class Conv1dSubsampling(nn.Module):
     """Conv1d Subsampling Block
 

@@ -2,14 +2,21 @@ import os
 import time
 
 import jiwer
+
+# Sentencepiece
 import sentencepiece as spm
 import torch
 import torch.nn as nn
 import torch.optim as optim
+
+# from torch.serialization import safe_globals
 from sentencepiece import SentencePieceProcessor
 from torch.utils.tensorboard import SummaryWriter
+
+# Other
 from tqdm import tqdm
 
+# Schedulers
 from app.models.schedules import *
 
 
@@ -108,7 +115,7 @@ class Model(nn.Module):
         print("Model Parameters :", self.num_params())
         if show_dict:
             for key, value in self.state_dict().items():
-                print(f"{key:<64} {str(tuple(value.size())):<16} mean {value.float().mean():<16.4f} std {value.float().std():<16.4f}")
+                print("{:<64} {:<16} mean {:<16.4f} std {:<16.4f}".format(key, str(tuple(value.size())), value.float().mean(), value.float().std()))
 
     def distribute_strategy(self, rank):
         self.rank = rank
@@ -156,7 +163,7 @@ class Model(nn.Module):
 
                 # Epoch Init
                 if self.rank == 0:
-                    print(f"Epoch {epoch + 1}/{epochs}")
+                    print("Epoch {}/{}".format(epoch + 1, epochs))
                     epoch_iterator = tqdm(dataset_train, total=steps_per_epoch * accumulated_steps if steps_per_epoch else None)
                 else:
                     epoch_iterator = dataset_train
@@ -242,12 +249,12 @@ class Model(nn.Module):
 
                                 # Print wer
                                 if self.rank == 0:
-                                    print(f"{dataset_name} wer : {100 * wer:.2f}% - loss : {val_loss:.4f}")
+                                    print("{} wer : {:.2f}% - loss : {:.4f}".format(dataset_name, 100 * wer, val_loss))
 
                                 # Logs Validation
                                 if self.rank == 0 and writer is not None:
-                                    writer.add_scalar(f"Validation/WER/{dataset_name}", 100 * wer, epoch + 1)
-                                    writer.add_scalar(f"Validation/MeanLoss/{dataset_name}", val_loss, epoch + 1)
+                                    writer.add_scalar("Validation/WER/{}".format(dataset_name), 100 * wer, epoch + 1)
+                                    writer.add_scalar("Validation/MeanLoss/{}".format(dataset_name), val_loss, epoch + 1)
                                     writer.add_text("Validation/Predictions/{}".format(dataset_name), "GroundTruth : " + truths[0] + " / Prediction : " + preds[0], epoch + 1)
 
                         else:
@@ -297,7 +304,7 @@ class Model(nn.Module):
         if checkpoint["is_distributed"] and not self.is_distributed:
             self.load_state_dict({key.replace(".module.", "."): value for key, value in checkpoint["model_state_dict"].items()})
         else:
-            self.load_state_dict(dict(checkpoint["model_state_dict"].items()))
+            self.load_state_dict({key: value for key, value in checkpoint["model_state_dict"].items()})
 
         # Model Step
         self.scheduler.model_step = checkpoint["model_step"]
@@ -343,7 +350,7 @@ class Model(nn.Module):
                 if beam_size > 1:
                     outputs_pred = self.beam_search_decoding(batch[0], batch[2], beam_size)
                 else:
-                    outputs_pred = self.gready_search_decoding(batch[0], batch[2])
+                    outputs_pred = self.greedy_search_decoding(batch[0], batch[2])
 
             # Sequence Truth
             outputs_true = self.tokenizer.decode(batch[1].tolist())
@@ -372,9 +379,9 @@ class Model(nn.Module):
             # Step print
             if self.rank == 0:
                 if eval_loss:
-                    eval_iterator.set_description(f"mean batch wer {100 * total_wer / (step + 1):.2f}% - batch wer: {100 * batch_wer:.2f}% - mean loss {total_loss / (step + 1):.4f} - batch loss: {batch_loss:.4f}")
+                    eval_iterator.set_description("mean batch wer {:.2f}% - batch wer: {:.2f}% - mean loss {:.4f} - batch loss: {:.4f}".format(100 * total_wer / (step + 1), 100 * batch_wer, total_loss / (step + 1), batch_loss))
                 else:
-                    eval_iterator.set_description(f"mean batch wer {100 * total_wer / (step + 1):.2f}% - batch wer: {100 * batch_wer:.2f}%")
+                    eval_iterator.set_description("mean batch wer {:.2f}% - batch wer: {:.2f}%".format(100 * total_wer / (step + 1), 100 * batch_wer))
 
             # Evaluation Steps
             if eval_steps:
@@ -429,9 +436,9 @@ class Model(nn.Module):
 
         if self.rank == 0:
             if epochs_list:
-                print(f"Stochastic Weight Averaging on checkpoints : {epochs_list}")
+                print("Stochastic Weight Averaging on checkpoints : {}".format(epochs_list))
             else:
-                print(f"Stochastic Weight Averaging on checkpoints : {start_epoch}-{end_epoch}")
+                print("Stochastic Weight Averaging on checkpoints : {}-{}".format(start_epoch, end_epoch))
 
         # Update SWA Model Params
         if epochs_list:
@@ -504,9 +511,9 @@ class Model(nn.Module):
                         outputs_pred = self.beam_search_decoding(batch[0], batch[2], beam_size)
                     else:
                         if rnnt_max_consec_dec_steps is not None:
-                            outputs_pred = self.gready_search_decoding(batch[0], batch[2], rnnt_max_consec_dec_steps)
+                            outputs_pred = self.greedy_search_decoding(batch[0], batch[2], rnnt_max_consec_dec_steps)
                         else:
-                            outputs_pred = self.gready_search_decoding(batch[0], batch[2])
+                            outputs_pred = self.greedy_search_decoding(batch[0], batch[2])
 
                 # Evaluation Steps
                 if eval_steps:

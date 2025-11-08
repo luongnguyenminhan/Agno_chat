@@ -70,7 +70,7 @@ def process_chat_message(self, conversation_id: str, user_message_id: str, conte
         if query_results:
             meeting_context = "\n\nThông tin từ tài liệu cuộc họp được tìm thấy:\n"
             for i, doc in enumerate(query_results[:3]):  # Limit to 3 documents for context
-                meeting_context += f"\nTài liệu {i+1}:\n{doc.get('payload', {}).get('text', 'Nội dung không có sẵn')}\n"
+                meeting_context += f"\nTài liệu {i + 1}:\n{doc.get('payload', {}).get('text', 'Nội dung không có sẵn')}\n"
             enhanced_content = content + meeting_context
             logger.info(f"Enhanced content with {len(query_results)} meeting documents for conversation_id={conversation_id}")
 

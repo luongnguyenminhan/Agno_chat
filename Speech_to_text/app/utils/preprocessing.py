@@ -1,4 +1,3 @@
-
 import torch
 
 # SentencePiece
@@ -9,29 +8,27 @@ import glob
 import os
 from tqdm import tqdm
 
-def collate_fn_pad(batch):
 
+def collate_fn_pad(batch):
     # Regular Mode
     if len(batch[0]) == 2:
-
         # Sorting sequences by lengths
         sorted_batch = sorted(batch, key=lambda x: x[0].shape[1], reverse=True)
 
         # Pad data sequences
         data = [item[0].squeeze() for item in sorted_batch]
-        data_lengths = torch.tensor([len(d) for d in data],dtype=torch.long) 
+        data_lengths = torch.tensor([len(d) for d in data], dtype=torch.long)
         data = torch.nn.utils.rnn.pad_sequence(data, batch_first=True, padding_value=0)
 
         # Pad labels
         target = [item[1] for item in sorted_batch]
-        target_lengths = torch.tensor([t.size(0) for t in target],dtype=torch.long)
+        target_lengths = torch.tensor([t.size(0) for t in target], dtype=torch.long)
         target = torch.nn.utils.rnn.pad_sequence(target, batch_first=True, padding_value=0)
 
         return data, target, data_lengths, target_lengths
 
     # LM Mode
     elif len(batch[0]) == 1:
-
         # Sort Batch
         sorted_batch = sorted(batch, key=lambda x: x[0].size(0), reverse=True)
         sorted_batch = [item[0] for item in sorted_batch]
@@ -45,16 +42,14 @@ def collate_fn_pad(batch):
         return x, x_len, y
 
     else:
-
         raise Exception("Batch Format Error")
 
-def create_tokenizer(training_params, tokenizer_params):
 
+def create_tokenizer(training_params, tokenizer_params):
     txt_files = glob.glob(training_params["training_dataset_path"] + "/*/" + "val/*.txt") + glob.glob(training_params["training_dataset_path"] + "/*/" + "train/*.txt")
 
     # LibriSpeech Dataset
     if training_params["training_dataset"] == "LibriSpeech":
-
         # Corpus File Path
         corpus_path = training_params["training_dataset_path"] + training_params["training_dataset"] + "_corpus.txt"
 

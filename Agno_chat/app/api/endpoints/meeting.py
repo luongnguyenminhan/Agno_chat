@@ -46,20 +46,13 @@ async def index_meeting(
         # Process transcript text if provided
         if transcript and transcript.strip():
             # Create a temporary text file for the transcript
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as temp_file:
                 temp_file.write(transcript)
                 temp_file_path = temp_file.name
 
             try:
                 # Process the transcript file using existing qdrant_service
-                success = await process_file(
-                    file_path=temp_file_path,
-                    collection_name=settings.QDRANT_COLLECTION_NAME,
-                    file_id=f"{meeting_id}_transcript",
-                    meeting_id=meeting_id,
-                    owner_user_id=current_user_id,
-                    file_type="transcript"
-                )
+                success = await process_file(file_path=temp_file_path, collection_name=settings.QDRANT_COLLECTION_NAME, file_id=f"{meeting_id}_transcript", meeting_id=meeting_id, owner_user_id=current_user_id, file_type="transcript")
 
                 if success:
                     processed_items.append("transcript")
@@ -77,28 +70,21 @@ async def index_meeting(
         # Process PDF file if provided
         if meeting_note_file and meeting_note_file.filename:
             # Validate file type
-            if not meeting_note_file.filename.lower().endswith('.pdf'):
+            if not meeting_note_file.filename.lower().endswith(".pdf"):
                 raise HTTPException(status_code=400, detail="Only PDF files are supported for meeting notes")
 
             # Create temporary file for the uploaded PDF
-            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
                 temp_file_path = temp_file.name
 
                 # Write uploaded file content to temporary file
                 content = await meeting_note_file.read()
-                with open(temp_file_path, 'wb') as f:
+                with open(temp_file_path, "wb") as f:
                     f.write(content)
 
             try:
                 # Process the PDF file using existing qdrant_service
-                success = await process_file(
-                    file_path=temp_file_path,
-                    collection_name=settings.QDRANT_COLLECTION_NAME,
-                    file_id=f"{meeting_id}_notes",
-                    meeting_id=meeting_id,
-                    owner_user_id=current_user_id,
-                    file_type="meeting_notes"
-                )
+                success = await process_file(file_path=temp_file_path, collection_name=settings.QDRANT_COLLECTION_NAME, file_id=f"{meeting_id}_notes", meeting_id=meeting_id, owner_user_id=current_user_id, file_type="meeting_notes")
 
                 if success:
                     processed_items.append("meeting_notes")
@@ -115,16 +101,7 @@ async def index_meeting(
         if not processed_items:
             raise HTTPException(status_code=500, detail="Failed to process any meeting content")
 
-        return MeetingIndexResponse(
-            success=True,
-            message=f"Successfully indexed meeting {meeting_id} content",
-            data={
-                "meeting_id": meeting_id,
-                "processed_items": processed_items,
-                "estimated_chunks": total_chunks,
-                "user_id": current_user_id
-            }
-        )
+        return MeetingIndexResponse(success=True, message=f"Successfully indexed meeting {meeting_id} content", data={"meeting_id": meeting_id, "processed_items": processed_items, "estimated_chunks": total_chunks, "user_id": current_user_id})
 
     except HTTPException:
         raise

@@ -120,7 +120,7 @@ def extract_audio_segments(audio_path, segments, output_dir=None):
     extracted_segments = []
     skipped_segments = 0
 
-    for (start_time, end_time, speaker) in segments:
+    for start_time, end_time, speaker in segments:
         # Convert time to sample indices
         start_sample = int(start_time * sample_rate)
         end_sample = int(end_time * sample_rate)
@@ -172,8 +172,7 @@ def diarize_and_transcribe_audio(audio_path, config_path, checkpoint_path, hf_to
 
     # Create model
     print("\033[94m[PIPELINE] Creating model...\033[0m")
-    model = create_model(config)
-    model = model.to(device)
+    model = create_model(config).to(device)
     model.eval()
     print("\033[92m[PIPELINE] Model created successfully\033[0m")
 
@@ -190,21 +189,16 @@ def diarize_and_transcribe_audio(audio_path, config_path, checkpoint_path, hf_to
     print(f"\033[94m[PIPELINE] Starting transcription of {len(segments)} segments...\033[0m")
     results = []
     for i, (speaker, start_time, end_time, audio_segment) in enumerate(extract_audio_segments(audio_path, segments)):
-        print(f"\033[94m[PIPELINE] Transcribing segment {i+1}/{len(segments)} - Speaker: {speaker}, Duration: {end_time-start_time:.2f}s\033[0m")
+        print(f"\033[94m[PIPELINE] Transcribing segment {i + 1}/{len(segments)} - Speaker: {speaker}, Duration: {end_time - start_time:.2f}s\033[0m")
 
         # Transcribe segment
         transcription = transcribe_audio_segment(model, audio_segment, device)
 
         if transcription:  # Only include non-empty transcriptions
-            print(f"\033[92m[PIPELINE] Segment {i+1} transcribed: '{transcription}'\033[0m")
-            results.append({
-                "speaker": speaker,
-                "start_time": start_time,
-                "end_time": end_time,
-                "transcription": transcription
-            })
+            print(f"\033[92m[PIPELINE] Segment {i + 1} transcribed: '{transcription}'\033[0m")
+            results.append({"speaker": speaker, "start_time": start_time, "end_time": end_time, "transcription": transcription})
         else:
-            print(f"\033[93m[PIPELINE] Segment {i+1} produced no transcription\033[0m")
+            print(f"\033[93m[PIPELINE] Segment {i + 1} produced no transcription\033[0m")
 
     print(f"\033[92m[PIPELINE] Pipeline completed: {len(results)} segments transcribed\033[0m")
     return results

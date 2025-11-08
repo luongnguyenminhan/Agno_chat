@@ -1,8 +1,13 @@
+# PyTorch
 import torch
 import torch.nn as nn
 
-from app.models.encoders import ConformerEncoder
-from app.models.losses import LossCTC
+from app.models.encoders import (
+    ConformerEncoder,
+)
+from app.models.losses import (
+    LossCTC,
+)
 from app.models.model import Model
 
 
@@ -56,7 +61,7 @@ class ModelCTC(Model):
         if self.rank == 0:
             print("Model encoder loaded at step {} from {}".format(checkpoint["model_step"], path))
 
-    def gready_search_decoding(self, x, x_len):
+    def greedy_search_decoding(self, x, x_len):
         # Forward Encoder (B, Taud) -> (B, T, Denc)
         logits, logits_len = self.encoder(x, x_len)[:2]
 
@@ -97,6 +102,6 @@ class ModelCTC(Model):
 
             # Append Sequence
             batch_pred_list.append(pred_list)
-
+        print("returning decoded sequences")
         # Decode Sequences
         return self.tokenizer.decode(batch_pred_list)

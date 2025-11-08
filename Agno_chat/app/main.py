@@ -96,7 +96,6 @@ async def startup_event():
     init_database()
 
 
-
 # Add middleware to log all requests
 @app.middleware("http")
 async def log_requests(request, call_next):
@@ -131,6 +130,7 @@ app.include_router(api_router)
 # Mount static files AFTER API router to avoid conflicts
 app.mount("/", StaticFiles(directory="app/static", html=True), name="static")
 
+
 # Serve chat application files directly for easier access
 @app.get("/chat/css", response_class=FileResponse)
 def serve_chat_css():
@@ -141,6 +141,7 @@ def serve_chat_css():
     else:
         raise HTTPException(status_code=404, detail="chat_bubble.css not found")
 
+
 @app.get("/chat/js", response_class=FileResponse)
 def serve_chat_js():
     """Serve chat_bubble.js file directly"""
@@ -149,6 +150,7 @@ def serve_chat_js():
         return FileResponse(file_path, media_type="application/javascript")
     else:
         raise HTTPException(status_code=404, detail="chat_bubble.js not found")
+
 
 # Combined chat application endpoint
 @app.get("/chat")

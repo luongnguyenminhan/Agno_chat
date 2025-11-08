@@ -11,7 +11,7 @@ class QdrantClientManager:
 
     def get_client(self) -> QdrantClient:
         """Get or create Qdrant client instance"""
-        api_key = getattr(settings, 'QDRANT_API_KEY', None)
+        api_key = getattr(settings, "QDRANT_API_KEY", None)
         print(api_key)
         if api_key:
             self._client = QdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT, api_key=api_key, timeout=30.0)

@@ -1,5 +1,3 @@
-
-import torch
 import torch.nn as nn
 
 from app.models.layers import Conv1d, Transpose
