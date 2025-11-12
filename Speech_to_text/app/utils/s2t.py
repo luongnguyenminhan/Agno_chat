@@ -31,18 +31,47 @@ def transcribe_audio_segment(model, audio_tensor, device="cpu"):
         # Convert stereo to mono
         audio_tensor = audio_tensor.mean(dim=0, keepdim=True)
 
-    # Handle variable length by padding to multiple of 360 (based on model architecture)
-    target_divisor = 360
-    seg_samples = audio_tensor.shape[1]
-    remainder = seg_samples % target_divisor
+    # Check if audio is too long and split into chunks
+    max_samples = 256000  # Based on train_audio_max_length from config
+    audio_length = audio_tensor.shape[1]
 
-    if remainder > 0:
-        pad_samples = target_divisor - remainder
-        print(f"\033[94m[S2T] Padding audio from {seg_samples} to {seg_samples + pad_samples} samples\033[0m")
-        audio_tensor = torch.nn.functional.pad(audio_tensor, (0, pad_samples), "constant", 0)
+    if audio_length > max_samples:
+        print(f"\033[93m[S2T] Audio too long ({audio_length} samples), splitting into chunks\033[0m")
+        chunk_size = max_samples
+        overlap = 16000  # 1 second overlap at 16kHz
+        chunks = []
 
+        start = 0
+        while start < audio_length:
+            end = min(start + chunk_size, audio_length)
+            chunk = audio_tensor[:, start:end]
+            chunks.append(chunk)
+            start = end - overlap if end < audio_length else end
+
+        print(f"\033[94m[S2T] Split into {len(chunks)} chunks\033[0m")
+
+        # Transcribe each chunk
+        transcriptions = []
+        for i, chunk in enumerate(chunks):
+            print(f"\033[94m[S2T] Transcribing chunk {i+1}/{len(chunks)} with shape: {chunk.shape}\033[0m")
+            transcription = _transcribe_single_chunk(model, chunk, device)
+            if transcription:
+                transcriptions.append(transcription)
+
+        # Combine transcriptions
+        result = " ".join(transcriptions).strip()
+        print(f"\033[92m[S2T] Combined transcription: '{result}'\033[0m")
+        return result
+    else:
+        return _transcribe_single_chunk(model, audio_tensor, device)
+
+
+def _transcribe_single_chunk(model, audio_tensor, device="cpu"):
+    """
+    Transcribe a single audio chunk.
+    """
     # Create length tensor
-    x_len = torch.tensor([seg_samples], device=device)
+    x_len = torch.tensor([audio_tensor.shape[1]], device=device)
 
     # Run inference
     print("\033[94m[S2T] Running inference...\033[0m")

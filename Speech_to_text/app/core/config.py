@@ -58,3 +58,5 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+for attr, value in settings.model_dump().items():
+    print(f"[CONFIG] {attr} = {value}")

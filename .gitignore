@@ -1,3 +1,15 @@
+__pycache__/
+*.pyc
+.env
+.idea/
+.vscode/
+.DS_Store
+venv/
+*.ckpt
+node_modules/
+dist/
+build/
+
 # Logs
 logs
 *.log
@@ -22,3 +34,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.venv
+/frontend/*/static/
