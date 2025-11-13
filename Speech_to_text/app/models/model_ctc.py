@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import logging
 
 # Base Model
 from app.models.model import Model
@@ -12,6 +13,11 @@ from app.models.losses import LossCTC, LossInterCTC
 
 # CTC Decode Beam Search
 from pyctcdecode import build_ctcdecoder
+
+# LM Scorer
+from app.models.lm_scorer import get_lm_scorer, BaseLMScorer
+
+logger = logging.getLogger(__name__)
 
 
 class ModelCTC(Model):
@@ -151,6 +157,115 @@ class ModelCTC(Model):
 
             # Convert characters back to token IDs
             batch_pred_list.append([ord(c) - self.ngram_offset for c in beam_result if c != ''])
+
+        # Decode Sequences
+        return self.tokenizer.decode(batch_pred_list)
+
+    def beam_search_with_lm_rescoring(
+        self,
+        x,
+        x_len,
+        lm_scorer: BaseLMScorer = None,
+        lm_weight: float = 0.3,
+        beam_size: int = None,
+    ):
+        """
+        Beam search decoding with LM rescoring (shallow fusion).
+        
+        Args:
+            x: Input audio features (B, T, D)
+            x_len: Input sequence lengths (B,)
+            lm_scorer: Language model scorer instance
+            lm_weight: Weight for LM score (0.0 to 1.0)
+            beam_size: Beam width for search
+            
+        Returns:
+            List of decoded text strings
+        """
+        # Use default beam size if not specified
+        if beam_size is None:
+            beam_size = self.beam_size
+
+        # Forward Encoder (B, Taud) -> (B, T, Denc)
+        logits, logits_len = self.encoder(x, x_len)[:2]
+
+        # FC Layer (B, T, Denc) -> (B, T, V)
+        logits = self.fc(logits)
+
+        # Apply Temperature
+        logits = logits / self.tmp
+
+        # Softmax -> Log
+        logP = logits.softmax(dim=-1).log()
+
+        # Build labels list: blank token (empty string) + vocab tokens
+        labels = [''] + [chr(idx + self.ngram_offset) for idx in range(1, self.tokenizer.vocab_size())]
+        
+        # Base CTC Decoder (no LM yet)
+        decoder = build_ctcdecoder(
+            labels=labels,
+            kenlm_model_path=None,  # We'll do LM rescoring separately
+        )
+
+        # Batch results
+        batch_pred_list = []
+
+        # Process each sample in batch
+        for b in range(logits.size(0)):
+            # Extract single sample: (T, V)
+            single_logP = logP[b, :logits_len[b], :].cpu().numpy()
+
+            # Get top-K beam hypotheses from CTC decoder
+            beam_results = decoder.decode_beams(
+                single_logP,
+                beam_width=beam_size * 2  # Get more candidates for rescoring
+            )
+
+            # If no LM scorer or weight is 0, use best CTC hypothesis
+            if lm_scorer is None or lm_weight == 0.0:
+                best_result = beam_results[0] if beam_results else ([], 0.0)
+                batch_pred_list.append([ord(c) - self.ngram_offset for c in best_result[0] if c != ''])
+                continue
+
+            # Rescore beam hypotheses with LM
+            rescored_hypotheses = []
+            
+            for text, ctc_score in beam_results[:beam_size]:
+                # Convert character sequence to text
+                hypothesis_text = ''.join(text)
+                
+                if not hypothesis_text:
+                    rescored_hypotheses.append((text, ctc_score))
+                    continue
+                
+                try:
+                    # Get LM score
+                    lm_score = lm_scorer.score_complete(hypothesis_text)
+                    
+                    # Shallow fusion: combine CTC and LM scores
+                    combined_score = (1.0 - lm_weight) * ctc_score + lm_weight * lm_score
+                    
+                    rescored_hypotheses.append((text, combined_score))
+                    
+                    logger.debug(
+                        f"[LM] Hypothesis: '{hypothesis_text[:30]}...' "
+                        f"CTC={ctc_score:.2f}, LM={lm_score:.2f}, "
+                        f"Combined={combined_score:.2f}"
+                    )
+                    
+                except Exception as e:
+                    logger.warning(f"[LM] Error rescoring hypothesis: {e}")
+                    # Fallback to CTC score only
+                    rescored_hypotheses.append((text, ctc_score))
+
+            # Sort by combined score (descending)
+            rescored_hypotheses.sort(key=lambda x: x[1], reverse=True)
+            
+            # Select best hypothesis
+            best_text = rescored_hypotheses[0][0] if rescored_hypotheses else []
+            
+            # Convert back to token IDs
+            batch_pred_list.append([ord(c) - self.ngram_offset for c in best_text if c != ''])
 
         # Decode Sequences
         return self.tokenizer.decode(batch_pred_list)

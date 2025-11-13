@@ -40,6 +40,13 @@ class Settings(BaseSettings):
 
     # Google AI Configuration
     GOOGLE_API_KEY: str = ""
+    
+    # Language Model Configuration
+    LM_TYPE: str = "gemini"  # Options: "none", "gemini"
+    LM_WEIGHT: float = 0.3  # Weight for LM score in shallow fusion (0.0 to 1.0)
+    LM_MODEL_NAME: str = "gemini-1.5-flash-8b"  # Gemini model for LM rescoring
+    LM_TEMPERATURE: float = 0.0  # Temperature for LM generation (0.0 = deterministic)
+    LM_MAX_TOKENS: int = 50  # Max tokens for LM continuation
 
     # HuggingFace Configuration
     HF_TOKEN: str = ""

@@ -1,8 +1,13 @@
 import os
 import time
 import torch
+import logging
 
 from app.models.model_ctc import ModelCTC
+from app.models.lm_scorer import get_lm_scorer
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def create_model(config_data):
@@ -68,10 +73,34 @@ def transcribe_audio_segment(model, audio_tensor, device="cpu"):
         return _transcribe_single_chunk(model, audio_tensor, device)
 
 
-def _transcribe_single_chunk(model, audio_tensor, device="cpu"):
+def _transcribe_single_chunk(model, audio_tensor, device="cpu", use_lm=None):
     """
-    Transcribe a single audio chunk using beam search decoding with fallback to greedy decoding.
+    Transcribe a single audio chunk using beam search decoding with optional LM rescoring.
+    
+    Args:
+        model: The loaded speech-to-text model
+        audio_tensor: Audio tensor to transcribe
+        device: Device to run inference on
+        use_lm: Enable LM rescoring (None=auto from settings, True=force, False=disable)
+    
+    Returns:
+        Transcribed text string
     """
+    # Determine if we should use LM
+    if use_lm is None:
+        use_lm = settings.LM_TYPE != "none"
+    
+    # Create LM scorer if enabled
+    lm_scorer = None
+    if use_lm:
+        try:
+            logger.info(f"[S2T] Initializing LM scorer (type={settings.LM_TYPE})")
+            lm_scorer = get_lm_scorer()
+            logger.info("[S2T] LM scorer initialized successfully")
+        except Exception as e:
+            logger.warning(f"[S2T] Failed to initialize LM scorer: {e}, proceeding without LM")
+            use_lm = False
+    
     # Create length tensor
     x_len = torch.tensor([audio_tensor.shape[1]], device=device)
 
@@ -81,6 +110,32 @@ def _transcribe_single_chunk(model, audio_tensor, device="cpu"):
         start_time = time.time()
         
         try:
+            # Use LM-enhanced beam search if available and enabled
+            if use_lm and lm_scorer and hasattr(model, 'beam_search_with_lm_rescoring'):
+                logger.info(
+                    f"[S2T] Using LM-enhanced beam search "
+                    f"(lm_weight={settings.LM_WEIGHT}, beam_size={getattr(model, 'beam_size', 1)})"
+                )
+                
+                transcription = model.beam_search_with_lm_rescoring(
+                    audio_tensor.to(device),
+                    x_len,
+                    lm_scorer=lm_scorer,
+                    lm_weight=settings.LM_WEIGHT,
+                )
+                
+                elapsed = time.time() - start_time
+                
+                # Handle result
+                if isinstance(transcription, list):
+                    result = transcription[0] if transcription else ""
+                else:
+                    result = transcription
+                
+                result = (result or "").lower().strip()
+                print(f"\033[92m[S2T] LM-enhanced beam search completed in {elapsed:.3f}s: '{result}'\033[0m")
+                return result
+                
             # Check if beam_search_decoding method is available
             if not hasattr(model, 'beam_search_decoding'):
                 raise AttributeError("Model does not have beam_search_decoding method")
