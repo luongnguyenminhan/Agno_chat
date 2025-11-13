@@ -18,7 +18,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
+*/EfficientConformerVietnamese/*
 node_modules
 dist
 dist-ssr
@@ -36,3 +36,5 @@ dist-ssr
 *.sw?
 .venv
 /frontend/*/static/
+*.binary
+.kiro/*

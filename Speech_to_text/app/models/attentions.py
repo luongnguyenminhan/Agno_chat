@@ -2,7 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# Layers
 from app.models.layers import Linear
+
+###############################################################################
+# Multi-Head Attention Layers
+###############################################################################
 
 
 class MultiHeadAttention(nn.Module):
@@ -409,6 +414,11 @@ class MultiHeadLinearAttention(MultiHeadAttention):
         O = self.output_layer(O)
 
         return O, KV.detach()
+
+
+###############################################################################
+# Multi-Head Self-Attention Layers with Relative Sinusoidal Poditional Encodings
+###############################################################################
 
 
 class RelPosMultiHeadSelfAttention(MultiHeadAttention):
@@ -953,62 +963,6 @@ class StridedRelPosMultiHeadSelfAttention(RelPosMultiHeadSelfAttention):
         return O, att_w.detach(), hidden
 
 
-class RelativeSinusoidalPositionalEncoding(nn.Module):
-    """
-    Relative Sinusoidal Positional Encoding
-
-    Positional encoding for left context (sin) and right context (cos)
-    Total context = 2 * max_len - 1
-    """
-
-    def __init__(self, max_len, dim_model, causal=False):
-        super(RelativeSinusoidalPositionalEncoding, self).__init__()
-
-        # PE
-        pos_encoding = torch.zeros(2 * max_len - 1, dim_model)
-
-        # Positions (max_len - 1, ..., max_len - 1)
-        pos_left = torch.arange(start=max_len - 1, end=0, step=-1, dtype=torch.float)
-        pos_right = torch.arange(start=0, end=-max_len, step=-1, dtype=torch.float)
-        pos = torch.cat([pos_left, pos_right], dim=0).unsqueeze(1)
-
-        # Angles
-        angles = pos / 10000 ** (2 * torch.arange(0, dim_model // 2, dtype=torch.float).unsqueeze(0) / dim_model)
-
-        # Rel Sinusoidal PE
-        pos_encoding[:, 0::2] = angles.sin()
-        pos_encoding[:, 1::2] = angles.cos()
-
-        pos_encoding = pos_encoding.unsqueeze(0)
-
-        self.register_buffer("pos_encoding", pos_encoding, persistent=False)
-        self.max_len = max_len
-        self.causal = causal
-
-    def forward(self, batch_size=1, seq_len=None, hidden_len=0):
-        # Causal Context
-        if self.causal:
-            # (B, Th + T, D)
-            if seq_len is not None:
-                R = self.pos_encoding[:, self.max_len - seq_len - hidden_len : self.max_len]
-
-            # (B, Tmax, D)
-            else:
-                R = self.pos_encoding[:, : self.max_len]
-
-        # Full Context
-        else:
-            # (B, Th + 2*T-1, D)
-            if seq_len is not None:
-                R = self.pos_encoding[:, self.max_len - seq_len - hidden_len : self.max_len - 1 + seq_len]
-
-            # (B, 2*Tmax-1, D)
-            else:
-                R = self.pos_encoding
-
-        return R.repeat(batch_size, 1, 1)
-
-
 class StridedLocalRelPosMultiHeadSelfAttention(RelPosMultiHeadSelfAttention):
     """Strided Local Multi-Head Self-Attention with Relative Sinusoidal Positional Encodings
 
@@ -1152,6 +1106,103 @@ class StridedLocalRelPosMultiHeadSelfAttention(RelPosMultiHeadSelfAttention):
         return O, att_w.detach(), hidden
 
 
+###############################################################################
+# Positional Encodings
+###############################################################################
+
+
+class SinusoidalPositionalEncoding(nn.Module):
+    """
+
+    Sinusoidal Positional Encoding
+
+    Reference: "Attention Is All You Need" by Vaswani et al.
+    https://arxiv.org/abs/1706.03762
+
+    """
+
+    def __init__(self, max_len, dim_model):
+        super(SinusoidalPositionalEncoding, self).__init__()
+
+        pos_encoding = torch.zeros(max_len, dim_model)
+        pos = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        i = torch.arange(0, dim_model // 2, dtype=torch.float).unsqueeze(0)
+        angles = pos / 10000 ** (2 * i / dim_model)
+
+        pos_encoding[:, 0::2] = angles.sin()
+        pos_encoding[:, 1::2] = angles.cos()
+        pos_encoding = pos_encoding.unsqueeze(0)
+
+        self.register_buffer("pos_encoding", pos_encoding, persistent=False)
+
+    def forward(self, batch_size=1, seq_len=None):
+        # (B, T, D)
+        if seq_len is not None:
+            P = self.pos_encoding[:, :seq_len]
+
+        # (B, Tmax, D)
+        else:
+            P = self.pos_encoding
+
+        return P.repeat(batch_size, 1, 1)
+
+
+class RelativeSinusoidalPositionalEncoding(nn.Module):
+    """
+    Relative Sinusoidal Positional Encoding
+
+    Positional encoding for left context (sin) and right context (cos)
+    Total context = 2 * max_len - 1
+    """
+
+    def __init__(self, max_len, dim_model, causal=False):
+        super(RelativeSinusoidalPositionalEncoding, self).__init__()
+
+        # PE
+        pos_encoding = torch.zeros(2 * max_len - 1, dim_model)
+
+        # Positions (max_len - 1, ..., max_len - 1)
+        pos_left = torch.arange(start=max_len - 1, end=0, step=-1, dtype=torch.float)
+        pos_right = torch.arange(start=0, end=-max_len, step=-1, dtype=torch.float)
+        pos = torch.cat([pos_left, pos_right], dim=0).unsqueeze(1)
+
+        # Angles
+        angles = pos / 10000 ** (2 * torch.arange(0, dim_model // 2, dtype=torch.float).unsqueeze(0) / dim_model)
+
+        # Rel Sinusoidal PE
+        pos_encoding[:, 0::2] = angles.sin()
+        pos_encoding[:, 1::2] = angles.cos()
+
+        pos_encoding = pos_encoding.unsqueeze(0)
+
+        self.register_buffer("pos_encoding", pos_encoding, persistent=False)
+        self.max_len = max_len
+        self.causal = causal
+
+    def forward(self, batch_size=1, seq_len=None, hidden_len=0):
+        # Causal Context
+        if self.causal:
+            # (B, Th + T, D)
+            if seq_len is not None:
+                R = self.pos_encoding[:, self.max_len - seq_len - hidden_len : self.max_len]
+
+            # (B, Tmax, D)
+            else:
+                R = self.pos_encoding[:, : self.max_len]
+
+        # Full Context
+        else:
+            # (B, Th + 2*T-1, D)
+            if seq_len is not None:
+                R = self.pos_encoding[:, self.max_len - seq_len - hidden_len : self.max_len - 1 + seq_len]
+
+            # (B, 2*Tmax-1, D)
+            else:
+                R = self.pos_encoding
+
+        return R.repeat(batch_size, 1, 1)
+
+
 class GroupedRelativeSinusoidalPositionalEncoding(nn.Module):
     """
     Relative Sinusoidal Positional Encoding for grouped multi-head attention
@@ -1207,42 +1258,6 @@ class GroupedRelativeSinusoidalPositionalEncoding(nn.Module):
         return R.repeat(batch_size, 1, 1)
 
 
-class SinusoidalPositionalEncoding(nn.Module):
-    """
-
-    Sinusoidal Positional Encoding
-
-    Reference: "Attention Is All You Need" by Vaswani et al.
-    https://arxiv.org/abs/1706.03762
-
-    """
-
-    def __init__(self, max_len, dim_model):
-        super(SinusoidalPositionalEncoding, self).__init__()
-
-        pos_encoding = torch.zeros(max_len, dim_model)
-        pos = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        i = torch.arange(0, dim_model // 2, dtype=torch.float).unsqueeze(0)
-        angles = pos / 10000 ** (2 * i / dim_model)
-
-        pos_encoding[:, 0::2] = angles.sin()
-        pos_encoding[:, 1::2] = angles.cos()
-        pos_encoding = pos_encoding.unsqueeze(0)
-
-        self.register_buffer("pos_encoding", pos_encoding, persistent=False)
-
-    def forward(self, batch_size=1, seq_len=None):
-        # (B, T, D)
-        if seq_len is not None:
-            P = self.pos_encoding[:, :seq_len]
-
-        # (B, Tmax, D)
-        else:
-            P = self.pos_encoding
-
-        return P.repeat(batch_size, 1, 1)
-
-
 ###############################################################################
 # Attention Masks
 ###############################################################################
@@ -1264,6 +1279,30 @@ class PaddingMask(nn.Module):
 
         else:
             return None
+
+
+class LookAheadMask(nn.Module):
+    def __init__(self):
+        super(LookAheadMask, self).__init__()
+        self.padding_mask = PaddingMask()
+
+    def forward(self, x, x_len):
+        # Seq Length T
+        seq_len = x.size(-1)
+
+        # Look Ahead Mask (T, T)
+        look_ahead_mask = x.new_ones(seq_len, seq_len).triu(diagonal=1)
+
+        if x_len is not None:
+            # Padding Mask (B, 1, 1, T)
+            padding_mask = self.padding_mask(seq_len, x_len)
+
+            # Look Ahead Mask + Padding Mask (B, 1, T, T)
+            return look_ahead_mask.maximum(padding_mask)
+
+        else:
+            # Look Ahead Mask + Padding Mask (1, 1, T, T)
+            return look_ahead_mask[None, None, :, :]
 
 
 class StreamingMask(nn.Module):

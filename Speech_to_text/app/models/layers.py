@@ -1,7 +1,15 @@
 import torch
-import torch._VF as _VF
 import torch.nn as nn
 import torch.nn.functional as F
+import torch._VF as _VF
+from torch.nn.modules.utils import _single, _pair
+
+# Activation Functions
+from app.models.activations import Swish
+
+###############################################################################
+# Layers
+###############################################################################
 
 
 class Linear(nn.Linear):
@@ -83,6 +91,40 @@ class Conv1d(nn.Conv1d):
         return F.conv1d(input, weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
 
 
+class Conv2d(nn.Conv2d):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros"):
+        super(Conv2d, self).__init__(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=groups, bias=bias, padding_mode=padding_mode)
+
+        # Variational Noise
+        self.noise = None
+        self.vn_std = None
+
+    def init_vn(self, vn_std):
+        # Variational Noise
+        self.vn_std = vn_std
+
+    def sample_synaptic_noise(self, distributed):
+        # Sample Noise
+        self.noise = torch.normal(mean=0.0, std=1.0, size=self.weight.size(), device=self.weight.device, dtype=self.weight.dtype)
+
+        # Broadcast Noise
+        if distributed:
+            torch.distributed.broadcast(self.noise, 0)
+
+    def forward(self, input):
+        # Weight
+        weight = self.weight
+
+        # Add Noise
+        if self.noise is not None and self.training:
+            weight = weight + self.vn_std * self.noise
+
+        # Apply Weight
+        if self.padding_mode != "zeros":
+            return F.conv2d(F.pad(input, self._reversed_padding_repeated_twice, mode=self.padding_mode), weight, self.bias, self.stride, _pair(0), self.dilation, self.groups)
+        return F.conv2d(input, weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
+
+
 class LSTM(nn.LSTM):
     def __init__(self, input_size, hidden_size, num_layers, batch_first, bidirectional):
         super(LSTM, self).__init__(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, batch_first=batch_first, bidirectional=bidirectional)
@@ -153,6 +195,66 @@ class LSTM(nn.LSTM):
             return output_packed, self.permute_hidden(hidden, unsorted_indices)
         else:
             return output, self.permute_hidden(hidden, unsorted_indices)
+
+
+class Embedding(nn.Embedding):
+    def __init__(self, num_embeddings, embedding_dim, padding_idx=None):
+        super(Embedding, self).__init__(num_embeddings=num_embeddings, embedding_dim=embedding_dim, padding_idx=padding_idx)
+
+        # Variational Noise
+        self.noise = None
+        self.vn_std = None
+
+    def init_vn(self, vn_std):
+        # Variational Noise
+        self.vn_std = vn_std
+
+    def sample_synaptic_noise(self, distributed):
+        # Sample Noise
+        self.noise = torch.normal(mean=0.0, std=1.0, size=self.weight.size(), device=self.weight.device, dtype=self.weight.dtype)
+
+        # Broadcast Noise
+        if distributed:
+            torch.distributed.broadcast(self.noise, 0)
+
+    def forward(self, input):
+        # Weight
+        weight = self.weight
+
+        # Add Noise
+        if self.noise is not None and self.training:
+            weight = weight + self.vn_std * self.noise
+
+        # Apply Weight
+        return F.embedding(input, weight, self.padding_idx, self.max_norm, self.norm_type, self.scale_grad_by_freq, self.sparse)
+
+
+class IdentityProjection(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(IdentityProjection, self).__init__()
+
+        assert output_dim > input_dim
+        self.linear = Linear(input_dim, output_dim - input_dim)
+
+    def forward(self, x):
+        # (B, T, Dout - Din)
+        proj = self.linear(x)
+
+        # (B, T, Dout)
+        x = torch.cat([x, proj], dim=-1)
+
+        return x
+
+
+class DepthwiseSeparableConv1d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding):
+        super(DepthwiseSeparableConv1d, self).__init__()
+
+        # Layers
+        self.layers = nn.Sequential(Conv1d(in_channels, in_channels, kernel_size, padding=padding, groups=in_channels, stride=stride), Conv1d(in_channels, out_channels, kernel_size=1), nn.BatchNorm1d(out_channels), Swish())
+
+    def forward(self, x):
+        return self.layers(x)
 
 
 class Transpose(nn.Module):

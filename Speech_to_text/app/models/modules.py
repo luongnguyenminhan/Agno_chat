@@ -2,21 +2,32 @@ import torch
 import torch.nn as nn
 import torchaudio
 
-from app.models.activations import Glu, Swish
+# Attentions
 from app.models.attentions import (
-    GroupedMultiHeadAttention,
-    GroupedRelPosMultiHeadSelfAttention,
-    LocalMultiHeadAttention,
-    LocalRelPosMultiHeadSelfAttention,
+    # Abs Attentions
     MultiHeadAttention,
-    MultiHeadLinearAttention,
-    RelPosMultiHeadSelfAttention,
-    StridedLocalMultiHeadAttention,
-    StridedLocalRelPosMultiHeadSelfAttention,
+    GroupedMultiHeadAttention,
+    LocalMultiHeadAttention,
     StridedMultiHeadAttention,
+    StridedLocalMultiHeadAttention,
+    MultiHeadLinearAttention,
+    # Rel Attentions
+    RelPosMultiHeadSelfAttention,
+    GroupedRelPosMultiHeadSelfAttention,
+    LocalRelPosMultiHeadSelfAttention,
     StridedRelPosMultiHeadSelfAttention,
+    StridedLocalRelPosMultiHeadSelfAttention,
 )
-from app.models.layers import Conv1d, Linear, Transpose
+
+# Layers
+from app.models.layers import Linear, Conv1d, Transpose, DepthwiseSeparableConv1d
+
+# Activations
+from app.models.activations import Swish, Glu
+
+###############################################################################
+# Audio Preprocessing
+###############################################################################
 
 
 class AudioPreprocessing(nn.Module):
@@ -114,6 +125,11 @@ class SpecAugment(nn.Module):
         return x
 
 
+###############################################################################
+# Conv Subsampling Modules
+###############################################################################
+
+
 class Conv1dSubsampling(nn.Module):
     """Conv1d Subsampling Block
 
@@ -138,9 +154,11 @@ class Conv1dSubsampling(nn.Module):
         assert norm in ["batch", "layer", "none"]
         assert act in ["relu", "swish", "none"]
 
+        # Layers
         self.layers = nn.ModuleList([nn.Sequential(nn.Conv1d(in_dim if layer_id == 0 else filters[layer_id - 1], filters[layer_id], kernel_size, stride=2, padding=(kernel_size - 1) // 2), nn.BatchNorm1d(filters[layer_id]) if norm == "batch" else nn.LayerNorm(filters[layer_id]) if norm == "layer" else nn.Identity(), nn.ReLU() if act == "relu" else Swish() if act == "swish" else nn.Identity()) for layer_id in range(num_layers)])
 
     def forward(self, x, x_len):
+        # Layers
         for layer in self.layers:
             x = layer(x)
 
@@ -181,6 +199,7 @@ class Conv2dSubsampling(nn.Module):
         # (B, D, T) -> (B, 1, D, T)
         x = x.unsqueeze(dim=1)
 
+        # Layers
         for layer in self.layers:
             x = layer(x)
 
@@ -218,12 +237,14 @@ class Conv2dPoolSubsampling(nn.Module):
         assert norm in ["batch", "layer", "none"]
         assert act in ["relu", "swish", "none"]
 
+        # Layers
         self.layers = nn.ModuleList([nn.Sequential(nn.Conv2d(1 if layer_id == 0 else filters[layer_id - 1], filters[layer_id], kernel_size, padding=(kernel_size - 1) // 2), nn.MaxPool2d(kernel_size=(3, 3), stride=(2, 2), padding=(1, 1)), nn.BatchNorm2d(filters[layer_id]) if norm == "batch" else nn.LayerNorm(filters[layer_id]) if norm == "layer" else nn.Identity(), nn.ReLU() if act == "relu" else Swish() if act == "swish" else nn.Identity()) for layer_id in range(num_layers)])
 
     def forward(self, x, x_len):
         # (B, D, T) -> (B, 1, D, T)
         x = x.unsqueeze(dim=1)
 
+        # Layers
         for layer in self.layers:
             x = layer(x)
 
@@ -298,6 +319,11 @@ class VGGSubsampling(nn.Module):
         return x, x_len
 
 
+###############################################################################
+# Conformer Modules
+###############################################################################
+
+
 class FeedForwardModule(nn.Module):
     """Transformer Feed Forward Module
 
@@ -319,6 +345,7 @@ class FeedForwardModule(nn.Module):
         # Assert
         assert act in ["relu", "swish"]
 
+        # Layers
         self.layers = nn.Sequential(nn.LayerNorm(dim_model, eps=1e-6), Linear(dim_model, dim_ffn), Swish() if act == "swish" else nn.ReLU(), nn.Dropout(p=Pdrop) if inner_dropout else nn.Identity(), Linear(dim_ffn, dim_model), nn.Dropout(p=Pdrop))
 
     def forward(self, x):
@@ -347,7 +374,7 @@ class MultiHeadSelfAttentionModule(nn.Module):
 
         # Assert
         assert not (group_size > 1 and kernel_size is not None), "Local grouped attention not implemented"
-        assert not (group_size > 1 and stride > 1 != None), "Strided grouped attention not implemented"
+        assert not (group_size > 1 and stride > 1 is not None), "Strided grouped attention not implemented"
         assert not (linear_att and relative_pos_enc), "Linear attention requires absolute positional encodings"
 
         # Pre Norm
@@ -436,7 +463,130 @@ class ConvolutionModule(nn.Module):
     def __init__(self, dim_model, dim_expand, kernel_size, Pdrop, stride, padding):
         super(ConvolutionModule, self).__init__()
 
+        # Layers
         self.layers = nn.Sequential(nn.LayerNorm(dim_model, eps=1e-6), Transpose(1, 2), Conv1d(dim_model, 2 * dim_expand, kernel_size=1), Glu(dim=1), Conv1d(dim_expand, dim_expand, kernel_size, stride=stride, padding=padding, groups=dim_expand), nn.BatchNorm1d(dim_expand), Swish(), Conv1d(dim_expand, dim_expand, kernel_size=1), Transpose(1, 2), nn.Dropout(p=Pdrop))
 
     def forward(self, x):
         return self.layers(x)
+
+
+###############################################################################
+# ContextNet Modules
+###############################################################################
+
+
+class ContextNetBlock(nn.Module):
+    def __init__(self, num_layers, dim_in, dim_out, kernel_size, stride, causal, se_ratio, residual, padding):
+        super(ContextNetBlock, self).__init__()
+
+        # Conv Layers
+        self.conv_layers = nn.Sequential(*[DepthwiseSeparableConv1d(dim_in if layer_id == 0 else dim_out, dim_out, kernel_size, stride if layer_id == num_layers - 1 else 1, causal) for layer_id in range(num_layers)])
+
+        # SE Module
+        self.se_module = SqueezeAndExcitationModule(dim_out, se_ratio, "swish") if se_ratio is not None else None
+
+        # Residual
+        self.residual = nn.Sequential(Conv1d(dim_in, dim_out, kernel_size=1, stride=stride, groups=1, padding=padding), nn.BatchNorm1d(dim_out)) if residual else None
+
+        # Block Act
+        self.act = Swish()
+
+    def forward(self, x):
+        # Conv Layers
+        y = self.conv_layers(x)
+
+        # SE Module
+        if self.se_module is not None:
+            y = self.se_module(y)
+
+        # Residual
+        if self.residual is not None:
+            y = self.act(y + self.residual(x))
+
+        return y
+
+
+class ContextNetSubsampling(nn.Module):
+    def __init__(self, n_mels, dim_model, kernel_size, causal):
+        super(ContextNetSubsampling, self).__init__()
+
+        # Blocks
+        self.blocks = nn.Sequential(
+            *[
+                ContextNetBlock(
+                    num_layers=1 if block_id == 0 else 5,
+                    dim_in=n_mels if block_id == 0 else dim_model,
+                    dim_out=dim_model,
+                    kernel_size=kernel_size,
+                    stride=2 if block_id in [3, 7] else 1,
+                    causal=causal,
+                    se_ratio=None if block_id == 0 else 8,
+                    residual=False if block_id == 0 else True,
+                )
+                for block_id in range(8)
+            ]
+        )
+
+    def forward(self, x, x_len):
+        # Blocks
+        x = self.blocks(x)
+
+        # Update Sequence Lengths
+        if x_len is not None:
+            x_len = torch.div(x_len - 1, 2, rounding_mode="floor") + 1
+            x_len = torch.div(x_len - 1, 2, rounding_mode="floor") + 1
+
+        return x, x_len
+
+
+###############################################################################
+# Modules
+###############################################################################
+
+
+class SqueezeAndExcitationModule(nn.Module):
+    """Squeeze And Excitation Module
+
+    Args:
+        input_dim: input feature dimension
+        reduction_ratio: bottleneck reduction ratio
+        inner_act: bottleneck inner activation function
+
+    Input: (batch_size, in_dim, in_length)
+    Output: (batch_size, out_dim, out_length)
+
+    """
+
+    def __init__(self, input_dim, reduction_ratio, inner_act="relu"):
+        super(SqueezeAndExcitationModule, self).__init__()
+
+        assert input_dim % reduction_ratio == 0
+        self.conv1 = Conv1d(input_dim, input_dim // reduction_ratio, kernel_size=1)
+        self.conv2 = Conv1d(input_dim // reduction_ratio, input_dim, kernel_size=1)
+
+        assert inner_act in ["relu", "swish"]
+        if inner_act == "relu":
+            self.inner_act = nn.ReLU()
+        elif inner_act == "swish":
+            self.inner_act = Swish()
+
+    def forward(self, x):
+        # Global avg Pooling
+        scale = x.mean(dim=-1, keepdim=True)
+
+        # (B, C, 1) -> (B, C // R, 1)
+        scale = self.conv1(scale)
+
+        # Inner Act
+        scale = self.inner_act(scale)
+
+        # (B, C // R, 1) -> (B, C, 1)
+        scale = self.conv2(scale)
+
+        # Sigmoid
+        scale = scale.sigmoid()
+
+        # Scale
+        x = x * scale
+
+        return x

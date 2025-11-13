@@ -1,9 +1,18 @@
 import torch
 import torch.nn as nn
 
-from app.models.attentions import SinusoidalPositionalEncoding, StreamingMask
+# Blocks
 from app.models.blocks import ConformerBlock
-from app.models.modules import AudioPreprocessing, Conv1dSubsampling, Conv2dPoolSubsampling, Conv2dSubsampling, SpecAugment, VGGSubsampling
+
+# Modules
+from app.models.modules import AudioPreprocessing, SpecAugment, Conv1dSubsampling, Conv2dSubsampling, Conv2dPoolSubsampling, VGGSubsampling
+
+# Positional Encodings and Masks
+from app.models.attentions import SinusoidalPositionalEncoding, StreamingMask
+
+###############################################################################
+# Encoder Models
+###############################################################################
 
 
 class ConformerEncoder(nn.Module):
@@ -87,3 +96,66 @@ class ConformerEncoder(nn.Module):
                     x_len = torch.div(x_len - 1, block.stride, rounding_mode="floor") + 1
 
         return x, x_len, attentions
+
+
+class ConformerEncoderInterCTC(ConformerEncoder):
+    def __init__(self, params):
+        super(ConformerEncoderInterCTC, self).__init__(params)
+
+        # Inter CTC blocks
+        self.interctc_blocks = params["interctc_blocks"]
+        for block_id in params["interctc_blocks"]:
+            self.__setattr__(name="linear_expand_" + str(block_id), value=nn.Linear(in_features=params["dim_model"][(block_id >= torch.tensor(params.get("expand_blocks", []))).sum()] if isinstance(params["dim_model"], list) else params["dim_model"], out_features=params["vocab_size"]))
+            self.__setattr__(name="linear_proj_" + str(block_id), value=nn.Linear(in_features=params["vocab_size"], out_features=params["dim_model"][(block_id >= torch.tensor(params.get("expand_blocks", []))).sum()] if isinstance(params["dim_model"], list) else params["dim_model"]))
+
+    def forward(self, x, x_len=None):
+        # Audio Preprocessing
+        x, x_len = self.preprocessing(x, x_len)
+
+        # Spec Augment
+        if self.training:
+            x = self.augment(x, x_len)
+
+        # Subsampling Module
+        x, x_len = self.subsampling_module(x, x_len)
+
+        # Padding Mask
+        mask = self.padding_mask(x, x_len)
+
+        # Transpose (B, D, T) -> (B, T, D)
+        x = x.transpose(1, 2)
+
+        # Linear Projection
+        x = self.linear(x)
+
+        # Dropout
+        x = self.dropout(x)
+
+        # Sinusoidal Positional Encodings
+        if self.pos_enc is not None:
+            x = x + self.pos_enc(x.size(0), x.size(1))
+
+        # Conformer Blocks
+        attentions = []
+        interctc_probs = []
+        for block_id, block in enumerate(self.blocks):
+            x, attention, hidden = block(x, mask)
+            attentions.append(attention)
+
+            # Strided Block
+            if block.stride > 1:
+                # Stride Mask (B, 1, T // S, T // S)
+                if mask is not None:
+                    mask = mask[:, :, :: block.stride, :: block.stride]
+
+                # Update Seq Lengths
+                if x_len is not None:
+                    x_len = torch.div(x_len - 1, block.stride, rounding_mode="floor") + 1
+
+            # Inter CTC Block
+            if block_id in self.interctc_blocks:
+                interctc_prob = self.__getattr__("linear_expand_" + str(block_id))(x).softmax(dim=-1)
+                interctc_probs.append(interctc_prob)
+                x = x + self.__getattr__("linear_proj_" + str(block_id))(interctc_prob)
+
+        return x, x_len, attentions, interctc_probs

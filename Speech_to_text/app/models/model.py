@@ -1,23 +1,19 @@
-import os
-import time
-
-import jiwer
-
-# Sentencepiece
-import sentencepiece as spm
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
-# from torch.serialization import safe_globals
-from sentencepiece import SentencePieceProcessor
 from torch.utils.tensorboard import SummaryWriter
 
-# Other
-from tqdm import tqdm
+# Sentencepiece
+import sentencepiece as spm
 
 # Schedulers
 from app.models.schedules import *
+
+# Other
+from tqdm import tqdm
+import jiwer
+import os
+import time
 
 
 def sample_synaptic_noise(m, distributed):
@@ -36,7 +32,6 @@ class Model(nn.Module):
 
         # Tokenizer
         try:
-            print("Tokenizer path: ", tokenizer_params["tokenizer_path"])
             self.tokenizer = spm.SentencePieceProcessor(tokenizer_params["tokenizer_path"])
         except:
             self.tokenizer = None
@@ -130,7 +125,6 @@ class Model(nn.Module):
 
         # Mixed Precision Gradient Scaler
         scaler = torch.cuda.amp.GradScaler(enabled=mixed_precision)
-        # scaler = torch.amp.GradScaler('cuda', enabled=mixed_precision)
 
         # Init Training
         acc_step = 0
@@ -278,7 +272,6 @@ class Model(nn.Module):
 
         # Exception Handler
         except Exception as e:
-            print(e)
             if self.is_distributed:
                 torch.distributed.destroy_process_group()
 
@@ -297,8 +290,7 @@ class Model(nn.Module):
 
     def load(self, path):
         # Load Model Checkpoint
-        with torch.serialization.safe_globals([SentencePieceProcessor]):
-            checkpoint = torch.load(path, map_location=next(self.parameters()).device)
+        checkpoint = torch.load(path, map_location=next(self.parameters()).device, weights_only=False)
 
         # Model State Dict
         if checkpoint["is_distributed"] and not self.is_distributed:
@@ -350,14 +342,13 @@ class Model(nn.Module):
                 if beam_size > 1:
                     outputs_pred = self.beam_search_decoding(batch[0], batch[2], beam_size)
                 else:
-                    outputs_pred = self.greedy_search_decoding(batch[0], batch[2])
+                    outputs_pred = self.gready_search_decoding(batch[0], batch[2])
 
             # Sequence Truth
             outputs_true = self.tokenizer.decode(batch[1].tolist())
 
             # Compute Batch wer and Update total wer
-            # batch_wer = jiwer.wer(outputs_true, outputs_pred, standardize=True)
-            batch_wer = jiwer.wer(outputs_true, outputs_pred, reference_transform=jiwer.wer_standardize, hypothesis_transform=jiwer.wer_standardize)
+            batch_wer = jiwer.wer(outputs_true, outputs_pred, standardize=True)
             total_wer += batch_wer
 
             # Update String lists
@@ -414,8 +405,7 @@ class Model(nn.Module):
         if total_wer / (eval_steps if eval_steps is not None else dataset_eval.__len__()) > 1:
             wer = 1
         else:
-            # wer = jiwer.wer(speech_true, speech_pred, standardize=True)
-            wer = jiwer.wer(speech_true, speech_pred, reference_transform=jiwer.wer_standardize, hypothesis_transform=jiwer.wer_standardize)
+            wer = jiwer.wer(speech_true, speech_pred, standardize=True)
 
         # Compute loss
         if eval_loss:
@@ -511,9 +501,9 @@ class Model(nn.Module):
                         outputs_pred = self.beam_search_decoding(batch[0], batch[2], beam_size)
                     else:
                         if rnnt_max_consec_dec_steps is not None:
-                            outputs_pred = self.greedy_search_decoding(batch[0], batch[2], rnnt_max_consec_dec_steps)
+                            outputs_pred = self.gready_search_decoding(batch[0], batch[2], rnnt_max_consec_dec_steps)
                         else:
-                            outputs_pred = self.greedy_search_decoding(batch[0], batch[2])
+                            outputs_pred = self.gready_search_decoding(batch[0], batch[2])
 
                 # Evaluation Steps
                 if eval_steps:

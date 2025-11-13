@@ -1,9 +1,11 @@
+import torch
 import torch.nn as nn
 
-from app.models.layers import Conv1d, Transpose
-
 # Modules
-from app.models.modules import ConvolutionModule, FeedForwardModule, MultiHeadSelfAttentionModule
+from app.models.modules import FeedForwardModule, MultiHeadSelfAttentionModule, ConvolutionModule
+
+# Layers
+from app.models.layers import Conv1d, Transpose
 
 
 class ConformerBlock(nn.Module):
@@ -50,5 +52,26 @@ class ConformerBlock(nn.Module):
 
         # Block Norm
         x = self.norm(x)
+
+        return x, attention, hidden
+
+
+class TransformerBlock(nn.Module):
+    def __init__(self, dim_model, ff_ratio, num_heads, Pdrop, max_pos_encoding, relative_pos_enc, causal):
+        super(TransformerBlock, self).__init__()
+
+        # Muti-Head Self-Attention Module
+        self.multi_head_self_attention_module = MultiHeadSelfAttentionModule(dim_model=dim_model, num_heads=num_heads, Pdrop=Pdrop, max_pos_encoding=max_pos_encoding, relative_pos_enc=relative_pos_enc, causal=causal, group_size=1, kernel_size=1, stride=1, efficient_att=False)
+
+        # Feed Forward Module
+        self.feed_forward_module = FeedForwardModule(dim_model=dim_model, dim_ffn=dim_model * ff_ratio, Pdrop=Pdrop, act="relu", inner_dropout=False)
+
+    def forward(self, x, mask=None, hidden=None):
+        # Muti-Head Self-Attention Module
+        x_att, attention, hidden = self.multi_head_self_attention_module(x, mask, hidden)
+        x = x + x_att
+
+        # Feed Forward Module
+        x = x + self.feed_forward_module(x)
 
         return x, attention, hidden
