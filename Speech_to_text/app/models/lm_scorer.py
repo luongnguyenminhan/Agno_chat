@@ -6,9 +6,10 @@ Supports multiple LM backends including Google Gemini API
 import logging
 import math
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
-import google.generativeai as genai
+import google.genai as genai
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -21,11 +22,11 @@ class BaseLMScorer(ABC):
     def score(self, text: str, candidates: List[str]) -> List[float]:
         """
         Score a list of candidate continuations given context text.
-        
+
         Args:
             text: Context text (partial transcription)
             candidates: List of candidate continuation strings
-            
+
         Returns:
             List of log probabilities for each candidate
         """
@@ -35,10 +36,10 @@ class BaseLMScorer(ABC):
     def score_complete(self, text: str) -> float:
         """
         Score a complete text sequence.
-        
+
         Args:
             text: Complete text to score
-            
+
         Returns:
             Log probability of the text
         """
@@ -60,7 +61,7 @@ class GeminiLMScorer(BaseLMScorer):
     ):
         """
         Initialize Gemini LM scorer.
-        
+
         Args:
             api_key: Google API key (defaults to settings.GOOGLE_API_KEY)
             model_name: Gemini model name
@@ -73,13 +74,11 @@ class GeminiLMScorer(BaseLMScorer):
         self.max_tokens = max_tokens
 
         if not self.api_key:
-            raise ValueError(
-                "GOOGLE_API_KEY not found. Set it in .env or pass to constructor."
-            )
+            raise ValueError("GOOGLE_API_KEY not found. Set it in .env or pass to constructor.")
 
         # Configure Gemini API
         genai.configure(api_key=self.api_key)
-        
+
         # Initialize model with optimized configuration
         self.model = genai.GenerativeModel(
             model_name=self.model_name,
@@ -89,50 +88,47 @@ class GeminiLMScorer(BaseLMScorer):
                 candidate_count=1,
             ),
         )
-        
-        logger.info(
-            f"[LM] Initialized GeminiLMScorer with model={self.model_name}, "
-            f"temperature={self.temperature}"
-        )
+
+        logger.info(f"[LM] Initialized GeminiLMScorer with model={self.model_name}, temperature={self.temperature}")
 
     def score(self, text: str, candidates: List[str]) -> List[float]:
         """
         Score candidate continuations using Gemini API.
         Uses perplexity-based scoring via prompt engineering.
-        
+
         Args:
             text: Context text
             candidates: List of candidate continuations
-            
+
         Returns:
             List of log probabilities (negative perplexity estimates)
         """
         scores = []
-        
+
         for candidate in candidates:
             try:
                 # Construct the complete sequence
                 full_text = text + " " + candidate if text else candidate
-                
+
                 # Score using perplexity estimation
                 score = self.score_complete(full_text)
                 scores.append(score)
-                
+
             except Exception as e:
                 logger.warning(f"[LM] Error scoring candidate '{candidate}': {e}")
                 # Return very low score for failed candidates
                 scores.append(-100.0)
-        
+
         return scores
 
     def score_complete(self, text: str) -> float:
         """
         Score complete text using Gemini API.
         Uses a prompt-based approach to estimate text quality/fluency.
-        
+
         Args:
             text: Complete text to score
-            
+
         Returns:
             Log probability estimate (higher = more fluent)
         """
@@ -152,10 +148,10 @@ Câu: "{text}"
 
             # Generate score using Gemini
             response = self.model.generate_content(prompt)
-            
+
             # Parse score from response
             score_text = response.text.strip()
-            
+
             # Extract numeric score
             try:
                 score = float(score_text)
@@ -164,36 +160,33 @@ Câu: "{text}"
             except ValueError:
                 # Try to extract first number from response
                 import re
-                numbers = re.findall(r'\d+\.?\d*', score_text)
+
+                numbers = re.findall(r"\d+\.?\d*", score_text)
                 if numbers:
                     score = float(numbers[0])
                     score = max(0, min(100, score))
                 else:
-                    logger.warning(
-                        f"[LM] Could not parse score from: {score_text}, using default"
-                    )
+                    logger.warning(f"[LM] Could not parse score from: {score_text}, using default")
                     score = 50.0
-            
+
             # Convert to log probability scale (0-100 → log scale)
             # Higher Gemini score → higher log prob
             log_prob = math.log(score + 1) - math.log(101)  # Normalize to [-4.6, 0]
-            
+
             return log_prob
-            
+
         except Exception as e:
             logger.error(f"[LM] Error scoring text '{text[:50]}...': {e}")
             return -10.0  # Default low score
 
-    def score_batch(
-        self, contexts: List[str], candidates_list: List[List[str]]
-    ) -> List[List[float]]:
+    def score_batch(self, contexts: List[str], candidates_list: List[List[str]]) -> List[List[float]]:
         """
         Score multiple contexts and their candidates in batch.
-        
+
         Args:
             contexts: List of context strings
             candidates_list: List of candidate lists (one per context)
-            
+
         Returns:
             List of score lists (one per context)
         """
@@ -225,16 +218,16 @@ def get_lm_scorer(
 ) -> BaseLMScorer:
     """
     Factory function to create LM scorer based on type.
-    
+
     Args:
         lm_type: Type of LM scorer ("gemini", "none", or None)
         **kwargs: Additional arguments for specific scorer types
-        
+
     Returns:
         BaseLMScorer instance
     """
     lm_type = lm_type or settings.LM_TYPE
-    
+
     if lm_type == "gemini":
         return GeminiLMScorer(
             model_name=kwargs.get("model_name", settings.LM_MODEL_NAME),
