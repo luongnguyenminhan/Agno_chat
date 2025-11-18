@@ -2,37 +2,8 @@ version: '3.8'
 
 services:
 
-  # chat_api:
-  #   build: ./Agno_chat
-  #   image: securescribe-chat-api
-  #   ports:
-  #     - "9999:8000"
-  #   env_file:
-  #     - .env
-  #   volumes:
-  #     - ./Agno_chat:/app
-  #   restart: unless-stopped
-  #   command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app
-  #   networks:
-  #     - securescribe-net
-  #   depends_on:
-  #     - redis
-
-  # chat_worker:
-  #   image: securescribe-chat-api
-  #   command: celery -A app.jobs.celery_worker worker --loglevel=info --concurrency=2
-  #   env_file:
-  #     - .env
-  #   volumes:
-  #     - ./Agno_chat:/app
-  #   restart: unless-stopped
-  #   networks:
-  #     - securescribe-net
-  #   depends_on:
-  #     - redis
-
   s2t_api:
-    build: ./Speech_to_text
+    build: .
     image: luongnguyenminhan/securescribe:s2t
     ports:
       - "9999:9998"

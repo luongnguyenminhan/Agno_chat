@@ -37,4 +37,3 @@ dist-ssr
 .venv
 /frontend/*/static/
 *.binary
-.kiro/*
